@@ -1,13 +1,13 @@
 import EventKit
 import Foundation
 
-// MARK: - DTOs
+// MARK: - response models
 //
 // Plain `Codable` value types returned by `EventStoreService`. They are shared by
 // the CLI (printed as JSON) and the MCP server (serialized into tool results), so
 // neither layer depends on EventKit types directly.
 
-public struct CalendarDTO: Codable, Sendable {
+public struct CalendarResponse: Codable, Sendable {
     public let id: String
     public let title: String
     public let type: String
@@ -16,7 +16,7 @@ public struct CalendarDTO: Codable, Sendable {
     public let isDefault: Bool
 }
 
-public struct ReminderDTO: Codable, Sendable {
+public struct ReminderResponse: Codable, Sendable {
     public let id: String
     public let title: String
     public let notes: String?
@@ -31,7 +31,7 @@ public struct ReminderDTO: Codable, Sendable {
     public let lastModified: Date?
 }
 
-public struct EventDTO: Codable, Sendable {
+public struct EventResponse: Codable, Sendable {
     public let id: String
     public let title: String
     public let notes: String?
@@ -47,7 +47,7 @@ public struct EventDTO: Codable, Sendable {
     public let lastModified: Date?
 }
 
-public struct AuthorizationStatusDTO: Codable, Sendable {
+public struct AuthorizationStatusResponse: Codable, Sendable {
     public let events: String
     public let reminders: String
 }
@@ -82,15 +82,15 @@ public enum ReminderPriority: String, CaseIterable, Sendable {
     }
 }
 
-// MARK: - EventKit -> DTO conversions
+// MARK: - EventKit -> response conversions
 
-extension CalendarDTO {
+extension CalendarResponse {
     init(_ calendar: EKCalendar, defaultId: String?) {
         self.id = calendar.calendarIdentifier
         self.title = calendar.title
-        self.type = CalendarDTO.typeName(calendar.type)
+        self.type = CalendarResponse.typeName(calendar.type)
         self.allowsModifications = calendar.allowsContentModifications
-        self.color = calendar.cgColor.flatMap(CalendarDTO.hexString(from:))
+        self.color = calendar.cgColor.flatMap(CalendarResponse.hexString(from:))
         self.isDefault = (defaultId != nil && defaultId == calendar.calendarIdentifier)
     }
 
@@ -114,7 +114,7 @@ extension CalendarDTO {
     }
 }
 
-extension ReminderDTO {
+extension ReminderResponse {
     init(_ reminder: EKReminder) {
         self.id = reminder.calendarItemIdentifier
         self.title = reminder.title ?? ""
@@ -131,7 +131,7 @@ extension ReminderDTO {
     }
 }
 
-extension EventDTO {
+extension EventResponse {
     init(_ event: EKEvent) {
         self.id = event.eventIdentifier ?? ""
         self.title = event.title ?? ""
@@ -143,7 +143,7 @@ extension EventDTO {
         self.isAllDay = event.isAllDay
         self.location = event.location
         self.url = event.url?.absoluteString
-        self.status = EventDTO.statusName(event.status)
+        self.status = EventResponse.statusName(event.status)
         self.creationDate = event.creationDate
         self.lastModified = event.lastModifiedDate
     }

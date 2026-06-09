@@ -162,7 +162,7 @@ Claude Desktop でレベルや出力先を変えたい場合は config に `env`
 ## 構成
 
 ```
-Sources/AppCore/   EventKit ラッパー(actor) + Codable DTO + 日付パース
+Sources/AppCore/   EventKit ラッパー(actor) + Codable レスポンス型 + 日付パース
 Sources/eventkitctl/    ArgumentParser の CLI + MCP serve
   Commands/             status / reminders / lists / events / calendars
   ToolDefinitions.swift MCP ツール定義とディスパッチ

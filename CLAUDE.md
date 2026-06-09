@@ -15,9 +15,10 @@ stdio）を兼ねる。Claude Desktop から使うことを想定。
     `EVENTKITCTL_LOG`(レベル) / `EVENTKITCTL_LOG_FILE`(出力先) で制御。`serve` 時は env 未指定でも
     `~/Library/Logs/eventkitctl.log` に出力する。
   - `EventStoreService.swift` — `EKEventStore` を包む **actor**。権限要求と全 CRUD はここに集約。
-    EventKit 型を外に漏らさず、Sendable な DTO だけを返す。
-  - `Models.swift` — `ReminderDTO` / `EventDTO` / `CalendarDTO` 等の Codable DTO と
-    EventKit→DTO 変換、`ReminderPriority`(none/low/medium/high ⇄ 0/9/5/1)。
+    EventKit 型を外に漏らさず、Sendable な response 型だけを返す。
+  - `Models.swift` — `ReminderResponse` / `EventResponse` / `CalendarResponse` 等の Codable な
+    レスポンス型（主用途は MCP のレスポンス。CLI でも流用）と EventKit→レスポンス変換、
+    `ReminderPriority`(none/low/medium/high ⇄ 0/9/5/1)。
   - `DateParsing.swift` — `EventKitDate.parse`（ISO8601 / `today`・`tomorrow`・`yesterday`）と
     共有 JSON encoder/decoder（ISO8601 日付）。
   - `Errors.swift` — `EventKitError`（`CustomStringConvertible` + `LocalizedError`）。
@@ -69,7 +70,7 @@ printf '%s\n' \
   CLI 側の結果出力は stdout で問題ない。
 - **Swift 6 strict concurrency**: `EKEventStore`・`EKReminder` などは非 Sendable。
   actor 境界やコンティニュエーションを跨いで EventKit オブジェクトを渡さない
-  （`fetchReminders` のコールバック内で DTO に変換してから resume している）。
+  （`fetchReminders` のコールバック内で response 型に変換してから resume している）。
 - 日付の追加対応は `DateParsing.swift` の 1 箇所に集約する。CLI と MCP は同じパーサを使う。
 
 ## スコープ外（将来）
