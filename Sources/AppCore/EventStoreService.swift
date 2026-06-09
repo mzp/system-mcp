@@ -1,5 +1,6 @@
 import EventKit
 import Foundation
+import Logging
 
 /// Filter presets for listing reminders.
 public enum ReminderFilter: Sendable, Equatable {
@@ -52,7 +53,11 @@ public actor EventStoreService {
         if EKEventStore.authorizationStatus(for: .reminder) == .notDetermined {
             _ = try? await store.requestFullAccessToReminders()
         }
-        return authorizationStatus()
+        let status = authorizationStatus()
+        log.info(
+            "authorization",
+            metadata: ["events": .string(status.events), "reminders": .string(status.reminders)])
+        return status
     }
 
     private func ensureRemindersAccess() async throws {
@@ -63,6 +68,7 @@ public actor EventStoreService {
             let granted = (try? await store.requestFullAccessToReminders()) ?? false
             if !granted { throw EventKitError.accessDenied(entity: "reminders") }
         default:
+            log.warning("reminders access denied", metadata: ["status": "\(EKEventStore.authorizationStatus(for: .reminder).rawValue)"])
             throw EventKitError.accessDenied(entity: "reminders")
         }
     }
@@ -75,6 +81,7 @@ public actor EventStoreService {
             let granted = (try? await store.requestFullAccessToEvents()) ?? false
             if !granted { throw EventKitError.accessDenied(entity: "calendar events") }
         default:
+            log.warning("calendar access denied", metadata: ["status": "\(EKEventStore.authorizationStatus(for: .event).rawValue)"])
             throw EventKitError.accessDenied(entity: "calendar events")
         }
     }
@@ -94,22 +101,29 @@ public actor EventStoreService {
     // MARK: - Calendars / Lists
 
     public func listCalendars() async throws -> [CalendarDTO] {
+        log.debug("listCalendars")
         try await ensureEventsAccess()
         let defaultId = store.defaultCalendarForNewEvents?.calendarIdentifier
-        return store.calendars(for: .event)
+        let result = store.calendars(for: .event)
             .map { CalendarDTO($0, defaultId: defaultId) }
             .sorted { $0.title.localizedCompare($1.title) == .orderedAscending }
+        log.debug("listCalendars result", metadata: ["count": "\(result.count)"])
+        return result
     }
 
     public func listReminderLists() async throws -> [CalendarDTO] {
+        log.debug("listReminderLists")
         try await ensureRemindersAccess()
         let defaultId = store.defaultCalendarForNewReminders()?.calendarIdentifier
-        return store.calendars(for: .reminder)
+        let result = store.calendars(for: .reminder)
             .map { CalendarDTO($0, defaultId: defaultId) }
             .sorted { $0.title.localizedCompare($1.title) == .orderedAscending }
+        log.debug("listReminderLists result", metadata: ["count": "\(result.count)"])
+        return result
     }
 
     public func createReminderList(name: String) async throws -> CalendarDTO {
+        log.debug("createReminderList", metadata: ["name": .string(name)])
         try await ensureRemindersAccess()
         let calendar = EKCalendar(for: .reminder, eventStore: store)
         calendar.title = name
@@ -130,6 +144,7 @@ public actor EventStoreService {
     }
 
     public func renameReminderList(idOrName: String, newName: String) async throws -> CalendarDTO {
+        log.debug("renameReminderList", metadata: ["list": .string(idOrName), "newName": .string(newName)])
         try await ensureRemindersAccess()
         let calendar = try reminderCalendar(idOrName: idOrName)
         calendar.title = newName
@@ -142,6 +157,7 @@ public actor EventStoreService {
     }
 
     public func deleteReminderList(idOrName: String) async throws {
+        log.debug("deleteReminderList", metadata: ["list": .string(idOrName)])
         try await ensureRemindersAccess()
         let calendar = try reminderCalendar(idOrName: idOrName)
         do {
@@ -154,6 +170,7 @@ public actor EventStoreService {
     // MARK: - Reminders
 
     public func fetchReminders(filter: ReminderFilter, list: String? = nil) async throws -> [ReminderDTO] {
+        log.debug("fetchReminders", metadata: ["filter": "\(filter)", "list": .string(list ?? "*")])
         try await ensureRemindersAccess()
         let calendars = try list.map { try [reminderCalendar(idOrName: $0)] }
 
@@ -202,13 +219,21 @@ public actor EventStoreService {
             }
         }
 
-        return filtered.sorted(by: Self.reminderOrder)
+        let result = filtered.sorted(by: Self.reminderOrder)
+        log.debug("fetchReminders result", metadata: ["count": "\(result.count)"])
+        return result
     }
 
     public func addReminder(
         title: String, list: String? = nil, due: Date? = nil, notes: String? = nil,
         priority: String? = nil
     ) async throws -> ReminderDTO {
+        log.debug(
+            "addReminder",
+            metadata: [
+                "title": .string(title), "list": .string(list ?? "<default>"),
+                "due": "\(due as Any)", "priority": .string(priority ?? "none"),
+            ])
         try await ensureRemindersAccess()
         let reminder = EKReminder(eventStore: store)
         reminder.title = title
@@ -221,6 +246,7 @@ public actor EventStoreService {
         if let due { reminder.dueDateComponents = EventKitDate.dueComponents(from: due) }
         if let priority { reminder.priority = try Self.priorityValue(priority) }
         try save(reminder)
+        log.info("reminder added", metadata: ["id": .string(reminder.calendarItemIdentifier)])
         return ReminderDTO(reminder)
     }
 
@@ -228,6 +254,13 @@ public actor EventStoreService {
         id: String, title: String? = nil, list: String? = nil, due: Date? = nil,
         notes: String? = nil, priority: String? = nil, completed: Bool? = nil
     ) async throws -> ReminderDTO {
+        log.debug(
+            "updateReminder",
+            metadata: [
+                "id": .string(id), "title": "\(title as Any)", "list": "\(list as Any)",
+                "due": "\(due as Any)", "priority": "\(priority as Any)",
+                "completed": "\(completed as Any)",
+            ])
         try await ensureRemindersAccess()
         guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else {
             throw EventKitError.notFound("reminder \(id)")
@@ -243,6 +276,7 @@ public actor EventStoreService {
     }
 
     public func completeReminders(ids: [String]) async throws -> [ReminderDTO] {
+        log.info("completeReminders", metadata: ["ids": .string(ids.joined(separator: ","))])
         try await ensureRemindersAccess()
         var result: [ReminderDTO] = []
         for id in ids {
@@ -257,6 +291,7 @@ public actor EventStoreService {
     }
 
     public func deleteReminders(ids: [String]) async throws {
+        log.info("deleteReminders", metadata: ["ids": .string(ids.joined(separator: ","))])
         try await ensureRemindersAccess()
         for id in ids {
             guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else {
@@ -273,18 +308,29 @@ public actor EventStoreService {
     // MARK: - Events
 
     public func fetchEvents(start: Date, end: Date, calendar: String? = nil) async throws -> [EventDTO] {
+        log.debug(
+            "fetchEvents",
+            metadata: ["start": "\(start)", "end": "\(end)", "calendar": .string(calendar ?? "*")])
         try await ensureEventsAccess()
         let calendars = try calendar.map { try [eventCalendar(idOrName: $0)] }
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: calendars)
-        return store.events(matching: predicate)
+        let result = store.events(matching: predicate)
             .map(EventDTO.init)
             .sorted { ($0.startDate ?? .distantPast) < ($1.startDate ?? .distantPast) }
+        log.debug("fetchEvents result", metadata: ["count": "\(result.count)"])
+        return result
     }
 
     public func addEvent(
         title: String, calendar: String? = nil, start: Date, end: Date, isAllDay: Bool = false,
         notes: String? = nil, location: String? = nil, url: String? = nil
     ) async throws -> EventDTO {
+        log.debug(
+            "addEvent",
+            metadata: [
+                "title": .string(title), "calendar": .string(calendar ?? "<default>"),
+                "start": "\(start)", "end": "\(end)", "allDay": "\(isAllDay)",
+            ])
         try await ensureEventsAccess()
         let event = EKEvent(eventStore: store)
         event.title = title
@@ -304,6 +350,7 @@ public actor EventStoreService {
         } catch {
             throw EventKitError.saveFailed(error.localizedDescription)
         }
+        log.info("event added", metadata: ["id": .string(event.eventIdentifier ?? "")])
         return EventDTO(event)
     }
 
@@ -312,6 +359,7 @@ public actor EventStoreService {
         end: Date? = nil, isAllDay: Bool? = nil, notes: String? = nil, location: String? = nil,
         url: String? = nil
     ) async throws -> EventDTO {
+        log.debug("updateEvent", metadata: ["id": .string(id)])
         try await ensureEventsAccess()
         guard let event = store.event(withIdentifier: id) else {
             throw EventKitError.notFound("event \(id)")
@@ -333,6 +381,7 @@ public actor EventStoreService {
     }
 
     public func deleteEvents(ids: [String]) async throws {
+        log.info("deleteEvents", metadata: ["ids": .string(ids.joined(separator: ","))])
         try await ensureEventsAccess()
         for id in ids {
             guard let event = store.event(withIdentifier: id) else {

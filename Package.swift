@@ -13,10 +13,14 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.11.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
     ],
     targets: [
         .target(
-            name: "AppCore"
+            name: "AppCore",
+            dependencies: [
+                .product(name: "Logging", package: "swift-log")
+            ]
         ),
         .executableTarget(
             name: "eventkitctl",

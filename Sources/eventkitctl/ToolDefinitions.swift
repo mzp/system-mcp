@@ -1,5 +1,6 @@
 import AppCore
 import Foundation
+import Logging
 import MCP
 
 // MARK: - Schema builders
@@ -187,6 +188,7 @@ private func missing(_ field: String) -> CallTool.Result {
 // MARK: - Dispatch
 
 func handleToolCall(name: String, arguments args: [String: Value]?) async -> CallTool.Result {
+    log.info("tool call", metadata: ["name": .string(name), "args": "\(args ?? [:])"])
     do {
         switch name {
         case "get_status":
@@ -287,8 +289,10 @@ func handleToolCall(name: String, arguments args: [String: Value]?) async -> Cal
             return errorResult("unknown tool: \(name)")
         }
     } catch let error as EventKitError {
+        log.error("tool failed", metadata: ["name": .string(name), "error": .string(error.description)])
         return errorResult(error.description)
     } catch {
+        log.error("tool failed", metadata: ["name": .string(name), "error": "\(error)"])
         return errorResult(error.localizedDescription)
     }
 }

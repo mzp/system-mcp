@@ -1,3 +1,4 @@
+import AppCore
 import ArgumentParser
 import Foundation
 import MCP
@@ -23,8 +24,12 @@ struct ServeCommand: AsyncParsableCommand {
             await handleToolCall(name: params.name, arguments: params.arguments)
         }
 
-        let transport = StdioTransport()
+        // Pass our stderr logger to the transport too, so protocol-level diagnostics
+        // (visible with EVENTKITCTL_LOG=debug) never touch stdout.
+        let transport = StdioTransport(logger: log)
+        log.info("MCP server starting", metadata: ["tools": "\(allTools.count)"])
         try await server.start(transport: transport)
         await server.waitUntilCompleted()
+        log.info("MCP server stopped")
     }
 }
