@@ -3,7 +3,7 @@ import AppCore
 import Foundation
 
 @main
-struct Eventkitctl: AsyncParsableCommand {
+struct Main: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "eventkitctl",
         abstract: "Control macOS Calendar & Reminders via EventKit, as a CLI or an MCP server.",

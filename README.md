@@ -111,6 +111,41 @@ eventkitctl events delete <id>
 > 先に `eventkitctl status` で権限を付与しておくこと。未許可だと各ツールは
 > アクセスエラーを返す。
 
+## ログ
+
+ログは **stderr** と **ファイル**に出力する（stdout は CLI の結果 JSON / MCP プロトコル専用なので汚さない）。
+環境変数で制御:
+
+| 変数 | 説明 |
+|---|---|
+| `EVENTKITCTL_LOG` | レベル: `trace`/`debug`/`info`/`notice`/`warning`/`error`/`critical`（既定 `info`、各操作のパラメータは `debug`） |
+| `EVENTKITCTL_LOG_FILE` | 出力先ファイル（`~` 展開可）。空文字でファイル出力オフ |
+
+`serve`（MCP）では `EVENTKITCTL_LOG_FILE` 未指定でも **`~/Library/Logs/eventkitctl.log`** に出力する
+（Claude Desktop から起動するとターミナルが無いため）。
+
+```sh
+# CLI でファイルにも出す
+EVENTKITCTL_LOG=debug EVENTKITCTL_LOG_FILE=/tmp/ek.log ek reminders list --filter today
+
+# MCP のログを追う
+tail -f ~/Library/Logs/eventkitctl.log
+```
+
+Claude Desktop でレベルや出力先を変えたい場合は config に `env` を追加:
+
+```json
+{
+  "mcpServers": {
+    "eventkitctl": {
+      "command": "/Users/mzp/ghq/github.com/mzp/eventkitctl/.build/release/eventkitctl",
+      "args": ["serve"],
+      "env": { "EVENTKITCTL_LOG": "debug" }
+    }
+  }
+}
+```
+
 ## 提供する MCP ツール
 
 | ツール | 説明 |

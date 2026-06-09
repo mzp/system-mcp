@@ -11,6 +11,9 @@ stdio）を兼ねる。Claude Desktop から使うことを想定。
 ## アーキテクチャ
 
 - **`Sources/AppCore/`** — ロジックの本体。CLI と MCP が共有するライブラリ。
+  - `Logging.swift` — 共有ロガー `log`。**stderr + 任意でファイル**に出力（stdout には絶対出さない）。
+    `EVENTKITCTL_LOG`(レベル) / `EVENTKITCTL_LOG_FILE`(出力先) で制御。`serve` 時は env 未指定でも
+    `~/Library/Logs/eventkitctl.log` に出力する。
   - `EventStoreService.swift` — `EKEventStore` を包む **actor**。権限要求と全 CRUD はここに集約。
     EventKit 型を外に漏らさず、Sendable な DTO だけを返す。
   - `Models.swift` — `ReminderDTO` / `EventDTO` / `CalendarDTO` 等の Codable DTO と
@@ -19,7 +22,8 @@ stdio）を兼ねる。Claude Desktop から使うことを想定。
     共有 JSON encoder/decoder（ISO8601 日付）。
   - `Errors.swift` — `EventKitError`（`CustomStringConvertible` + `LocalizedError`）。
 - **`Sources/eventkitctl/`** — 実行ファイル。
-  - `Eventkitctl.swift` — ArgumentParser ルート、`Output.json`、グローバル `service`(actor 共有インスタンス)。
+  - `Main.swift` — ArgumentParser ルート(`@main struct Main`、commandName は `eventkitctl`)、
+    `Output.json`、グローバル `service`(actor 共有インスタンス)。
   - `Commands/` — `status` / `reminders` / `lists` / `events` / `calendars` サブコマンド。
   - `ToolDefinitions.swift` — MCP ツール定義(`allTools`)と `handleToolCall` ディスパッチ。
   - `MCPServer.swift` — `serve` サブコマンド（`Server` + `StdioTransport`）。
@@ -60,8 +64,9 @@ printf '%s\n' \
   さらに**対話的なターミナル/アプリから一度起動して許可ダイアログを承認**しないと
   `fullAccess` にならない。ヘッドレス/サンドボックス環境では `notDetermined` のままになり、
   各操作は `EventKitError.accessDenied` を返す（クラッシュはしない）。
-- **MCP の stdout はプロトコル専用**。`serve` 中はログやデバッグ出力を **stdout に出さない**こと
-  （`StdioTransport` は既定で NoOp ロガー。診断は stderr へ）。CLI 側の結果出力は stdout で問題ない。
+- **MCP の stdout はプロトコル専用**。`serve` 中はログやデバッグ出力を **stdout に出さない**こと。
+  ロガー(`log`)は stderr + ファイルのみに出力し、`StdioTransport` にも同じ `log` を渡している。
+  CLI 側の結果出力は stdout で問題ない。
 - **Swift 6 strict concurrency**: `EKEventStore`・`EKReminder` などは非 Sendable。
   actor 境界やコンティニュエーションを跨いで EventKit オブジェクトを渡さない
   （`fetchReminders` のコールバック内で DTO に変換してから resume している）。
