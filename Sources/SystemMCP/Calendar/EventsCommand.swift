@@ -34,7 +34,8 @@ struct EventsCommand: AsyncParsableCommand {
         @Option(help: "End (ISO8601 or today/tomorrow).") var end: String
         @Flag(help: "All-day event.") var allDay: Bool = false
         @Option(help: "Notes.") var notes: String?
-        @Option(help: "Location.") var location: String?
+        @Option(help: "Location (address or place name; geocoded to map coordinates when resolvable).")
+        var location: String?
         @Option(help: "URL.") var url: String?
 
         func run() async throws {
@@ -57,7 +58,8 @@ struct EventsCommand: AsyncParsableCommand {
         @Option(help: "New end (ISO8601 or today/tomorrow).") var end: String?
         @Flag(inversion: .prefixedNo, help: "All-day event.") var allDay: Bool?
         @Option(help: "New notes.") var notes: String?
-        @Option(help: "New location.") var location: String?
+        @Option(help: "New location (address or place name; geocoded to map coordinates when resolvable).")
+        var location: String?
         @Option(help: "New URL.") var url: String?
 
         func run() async throws {

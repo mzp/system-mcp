@@ -35,7 +35,10 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
     - `ReminderPriority.swift` — `ReminderPriority`(none/low/medium/high ⇄ 0/1/5/9)。
   - `Calendar/` — event ドメイン。
     - `EventKitService+Events.swift` — `extension EventKitService` に event/calendar の CRUD（`public`）。
-    - `EventResponse.swift` — `EventResponse` + EK 変換。
+      location は `Geocoder` で座標解決して `EKStructuredLocation` をセット（解決不能ならテキストのみ）。
+    - `Geocoder.swift` — `CLGeocoder` による住所文字列→座標の前方ジオコーディング
+      （位置情報権限は不要・ネットワークは必要。失敗時は nil を返すだけでエラーにしない）。
+    - `EventResponse.swift` — `EventResponse` + EK 変換（`latitude`/`longitude` は `structuredLocation` 由来）。
     - `CalendarResponse.swift` — カレンダー / リマインダーリスト両用のレスポンス型（`listCalendars` と `listReminderLists` が返す）。
   - ルート直下（ドメイン非依存）:
     - `DateParsing.swift` — `DateParsing.parse`（ISO8601 / `today`・`tomorrow`・`yesterday`）と共有 JSON encoder/decoder。

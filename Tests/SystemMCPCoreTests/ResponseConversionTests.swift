@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreLocation
 import EventKit
 import Foundation
 import Testing
@@ -78,8 +79,23 @@ import Testing
         #expect(response.endDate == start.addingTimeInterval(1800))
         #expect(response.isAllDay == false)
         #expect(response.location == "Zoom")
+        #expect(response.latitude == nil)  // plain-text location carries no coordinates
+        #expect(response.longitude == nil)
         #expect(response.url == "https://example.com/meet")
         #expect(response.status == nil)  // EKEventStatus.none -> nil
+    }
+
+    @Test func convertsStructuredLocationCoordinates() {
+        let store = EKEventStore()
+        let event = EKEvent(eventStore: store)
+        let structured = EKStructuredLocation(title: "東京都港区芝公園4-2-8")
+        structured.geoLocation = CLLocation(latitude: 35.6586, longitude: 139.7454)
+        event.structuredLocation = structured
+
+        let response = EventResponse(event)
+        #expect(response.location == "東京都港区芝公園4-2-8")  // title propagates to location
+        #expect(response.latitude == 35.6586)
+        #expect(response.longitude == 139.7454)
     }
 
     @Test func handlesEmptyEvent() {

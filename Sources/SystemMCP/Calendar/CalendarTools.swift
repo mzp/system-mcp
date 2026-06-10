@@ -38,7 +38,7 @@ enum CalendarMCP {
                     "end": string("End, ISO8601 or today/tomorrow"),
                     "allDay": bool("All-day event"),
                     "notes": string("Notes"),
-                    "location": string("Location"),
+                    "location": string("Location (address or place name; geocoded to map coordinates when resolvable)"),
                     "url": string("URL"),
                 ], required: ["title", "start", "end"])),
         Tool(
@@ -53,7 +53,8 @@ enum CalendarMCP {
                     "end": string("New end, ISO8601 or today/tomorrow"),
                     "allDay": bool("All-day event"),
                     "notes": string("New notes"),
-                    "location": string("New location"),
+                    "location": string(
+                        "New location (address or place name; geocoded to map coordinates when resolvable)"),
                     "url": string("New URL"),
                 ], required: ["id"])),
         Tool(

@@ -1,3 +1,4 @@
+import CoreLocation
 import EventKit
 import Foundation
 
@@ -55,7 +56,7 @@ extension EventKitService {
         event.endDate = end
         event.isAllDay = isAllDay
         if let notes { event.notes = notes }
-        if let location { event.location = location }
+        if let location { event.structuredLocation = await structuredLocation(for: location) }
         if let url { event.url = URL(string: url) }
         do {
             try store.save(event, span: .thisEvent, commit: true)
@@ -82,7 +83,7 @@ extension EventKitService {
         if let end { event.endDate = end }
         if let isAllDay { event.isAllDay = isAllDay }
         if let notes { event.notes = notes }
-        if let location { event.location = location }
+        if let location { event.structuredLocation = await structuredLocation(for: location) }
         if let url { event.url = URL(string: url) }
         do {
             try store.save(event, span: .thisEvent, commit: true)
@@ -111,6 +112,25 @@ extension EventKitService {
 
     private func ensureEventsAccess() async throws {
         try await ensureAccess(to: .event, label: "calendar events")
+    }
+
+    /// Builds a structured location for the event. With coordinates attached the
+    /// Calendar app shows the map card / travel time; assigning `structuredLocation`
+    /// also sets the plain `location` text from its title, so an un-geocodable
+    /// string degrades to today's text-only behavior.
+    private func structuredLocation(for location: String) async -> EKStructuredLocation {
+        let structured = EKStructuredLocation(title: location)
+        if let coordinate = await Geocoder.coordinate(for: location) {
+            structured.geoLocation = CLLocation(
+                latitude: coordinate.latitude, longitude: coordinate.longitude)
+            log.debug(
+                "location geocoded",
+                metadata: [
+                    "location": .string(location),
+                    "lat": "\(coordinate.latitude)", "lon": "\(coordinate.longitude)",
+                ])
+        }
+        return structured
     }
 
     private func eventCalendar(idOrName: String) throws -> EKCalendar {

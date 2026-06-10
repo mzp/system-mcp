@@ -13,6 +13,8 @@ public struct EventResponse: Codable, Sendable {
     public let endDate: Date?
     public let isAllDay: Bool
     public let location: String?
+    public let latitude: Double?
+    public let longitude: Double?
     public let url: String?
     public let status: String?
     public let creationDate: Date?
@@ -30,6 +32,9 @@ extension EventResponse {
         self.endDate = event.endDate
         self.isAllDay = event.isAllDay
         self.location = event.location
+        let coordinate = event.structuredLocation?.geoLocation?.coordinate
+        self.latitude = coordinate?.latitude
+        self.longitude = coordinate?.longitude
         self.url = event.url?.absoluteString
         self.status = EventResponse.statusName(event.status)
         self.creationDate = event.creationDate
