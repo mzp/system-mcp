@@ -6,7 +6,7 @@ import Foundation
 ///   - ISO8601 with time:      `2026-06-10T10:00:00`, `2026-06-10T10:00`, `2026-06-10 10:00`
 ///   - Date only:              `2026-06-10` (resolves to start of day, local time)
 ///   - Relative keywords:      `today`, `tomorrow`, `yesterday` (start of day, local time)
-public enum EventKitDate {
+public enum DateParsing {
     public static func parse(_ string: String) -> Date? {
         let trimmed = string.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }

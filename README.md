@@ -1,21 +1,26 @@
-# eventkitctl
+# systemmcp
 
-macOS のカレンダー・リマインダーを **EventKit** 経由で操作する Swift 製ツール。
-1つのバイナリで **CLI** としても **MCP サーバー** としても動き、Claude Desktop から
-カレンダー/リマインダーを読み書きできる。
+macOS のリマインダー・カレンダーを **EventKit** 経由で操作する Swift 製ツール。
+1 つのバイナリ **`systemmcp`** が 2 つのドメインをサブコマンドに分けて持つ:
 
-`mikakoivisto/reminders-mcp`(TS製ラッパー)と `openclaw/remindctl`(Swift CLI)を参考に、
-CLI と MCP を1プロジェクトに統合したもの。
+- **`systemmcp reminder ...`** — リマインダーとリマインダーリスト
+- **`systemmcp calendar ...`** — カレンダーとイベント
+
+各ドメインは **CLI** としても **MCP サーバー**（`... serve`、stdio）としても動き、Claude Desktop から
+それぞれを読み書きできる。共通ロジックとドメインロジックは `SystemMCPCore` ライブラリに集約している。
 
 ## 特徴
 
-- リマインダー: 一覧(today/tomorrow/week/overdue/upcoming/completed/all・日付範囲)、追加・編集・完了・削除
-- リマインダーリスト: 一覧・作成・リネーム・削除
-- カレンダー: 一覧
-- イベント: 期間指定の一覧、追加・編集・削除
+- **reminder**
+  - リマインダー: 一覧(today/tomorrow/week/overdue/upcoming/completed/all・日付範囲)、追加・編集・完了・削除
+  - リマインダーリスト: 一覧・作成・リネーム・削除
+- **calendar**
+  - カレンダー: 一覧
+  - イベント: 期間指定の一覧、追加・編集・削除
 - EventKit を直接利用するので iCloud 同期はそのまま機能する
+- 操作した側の権限だけを要求する（`reminder` はリマインダー、`calendar` はカレンダー）
 
-> 繰り返し・アラーム・場所トリガーは現状スコープ外（将来対応）。
+> 繰り返し・アラーム・場所トリガーは現状スコープ外（将来対応、`TODO.md` 参照）。
 
 ## 必要環境
 
@@ -32,10 +37,10 @@ make install
 
 1. `swift build -c release`
 2. `codesign` でバイナリに署名（TCC が許可を記憶できるようにするため）
-3. `.build/release/eventkitctl` の絶対パスを表示
+3. `.build/release/systemmcp` の絶対パスを表示
 
 Info.plist（権限の説明文）はリンク時にバイナリへ埋め込み済み
-（`Package.swift` の `linkerSettings` 参照）。
+（`Package.swift` の `linkerSettings` 参照。リマインダー + カレンダー両方の usage description）。
 
 Developer ID で署名したい場合:
 
@@ -45,61 +50,66 @@ make sign SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
 
 ## 権限の付与（初回のみ）
 
-ターミナルから一度実行して、表示されるダイアログで許可する:
+各ドメインをターミナルから一度実行して、表示されるダイアログで許可する:
 
 ```sh
-.build/release/eventkitctl status
-# => {"events":"fullAccess","reminders":"fullAccess"} になればOK
+.build/release/systemmcp reminder status
+# => {"entity":"reminders","status":"fullAccess"} になればOK
+.build/release/systemmcp calendar status
+# => {"entity":"calendar","status":"fullAccess"} になればOK
 ```
 
-許可後は System Settings → プライバシーとセキュリティ →
-カレンダー / リマインダー に `eventkitctl` が現れる。
+許可後は System Settings → プライバシーとセキュリティ → リマインダー / カレンダー に `systemmcp` が現れる。
 
 ## CLI の使い方
 
-すべて JSON を標準出力に返す。
+すべて JSON を標準出力に返す。日付は ISO8601（`2026-06-10` / `2026-06-10T10:00`）または
+`today` / `tomorrow` / `yesterday` が使える。
 
 ```sh
-# 認可状態
-eventkitctl status
+# --- reminder ---
+systemmcp reminder status
 
-# リスト / カレンダー一覧
-eventkitctl lists list
-eventkitctl calendars list
+# リスト
+systemmcp reminder lists list
+systemmcp reminder lists create "仕事"
+systemmcp reminder lists rename "仕事" "Work"
+systemmcp reminder lists delete "Work"
 
 # リマインダー
-eventkitctl reminders list --filter today
-eventkitctl reminders list --start 2026-06-08 --end 2026-06-15
-eventkitctl reminders add --title "牛乳を買う" --due tomorrow --priority high --list "買い物"
-eventkitctl reminders update <id> --completed
-eventkitctl reminders complete <id> [<id>...]
-eventkitctl reminders delete <id> [<id>...]
+systemmcp reminder reminders list --filter today
+systemmcp reminder reminders list --start 2026-06-08 --end 2026-06-15
+systemmcp reminder reminders add --title "牛乳を買う" --due tomorrow --priority high --list "買い物"
+systemmcp reminder reminders update <id> --completed
+systemmcp reminder reminders complete <id> [<id>...]
+systemmcp reminder reminders delete <id> [<id>...]
 
-# リスト管理
-eventkitctl lists create "仕事"
-eventkitctl lists rename "仕事" "Work"
-eventkitctl lists delete "Work"
+# --- calendar ---
+systemmcp calendar status
 
-# イベント
-eventkitctl events list --start today --end 2026-06-30
-eventkitctl events add --title "会議" --start "2026-06-10T10:00" --end "2026-06-10T11:00"
-eventkitctl events update <id> --location "会議室A"
-eventkitctl events delete <id>
+# カレンダー / イベント
+systemmcp calendar calendars list
+systemmcp calendar events list --start today --end 2026-06-30
+systemmcp calendar events add --title "会議" --start "2026-06-10T10:00" --end "2026-06-10T11:00"
+systemmcp calendar events update <id> --location "会議室A"
+systemmcp calendar events delete <id>
 ```
-
-日付は ISO8601（`2026-06-10` / `2026-06-10T10:00`）または
-`today` / `tomorrow` / `yesterday` が使える。
 
 ## Claude Desktop への登録
 
-`~/Library/Application Support/Claude/claude_desktop_config.json`:
+各ドメインは独立した MCP サーバーなので、`mcpServers` に **2 エントリ**を登録する（同じ `systemmcp`
+バイナリを別 args で呼ぶ）。`~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
-    "eventkitctl": {
-      "command": "/Users/mzp/ghq/github.com/mzp/eventkitctl/.build/release/eventkitctl",
-      "args": ["serve"]
+    "apple-reminder": {
+      "command": "/Users/mzp/ghq/github.com/mzp/eventkitctl/.build/release/systemmcp",
+      "args": ["reminder", "serve"]
+    },
+    "apple-calendar": {
+      "command": "/Users/mzp/ghq/github.com/mzp/eventkitctl/.build/release/systemmcp",
+      "args": ["calendar", "serve"]
     }
   }
 }
@@ -107,9 +117,9 @@ eventkitctl events delete <id>
 
 `command` は `make install` が表示する絶対パスに置き換える。Claude Desktop を再起動すると
 「今日のリマインダー教えて」「明日10時に会議を入れて」などで使えるようになる。
+不要な方だけ登録してもよい。
 
-> 先に `eventkitctl status` で権限を付与しておくこと。未許可だと各ツールは
-> アクセスエラーを返す。
+> 先に各ドメインの `status` で権限を付与しておくこと。未許可だと各ツールはアクセスエラーを返す。
 
 ## ログ
 
@@ -118,29 +128,29 @@ eventkitctl events delete <id>
 
 | 変数 | 説明 |
 |---|---|
-| `EVENTKITCTL_LOG` | レベル: `trace`/`debug`/`info`/`notice`/`warning`/`error`/`critical`（既定 `info`、各操作のパラメータは `debug`） |
-| `EVENTKITCTL_LOG_FILE` | 出力先ファイル（`~` 展開可）。空文字でファイル出力オフ |
+| `SYSTEM_MCP_LOG` | レベル: `trace`/`debug`/`info`/`notice`/`warning`/`error`/`critical`（既定 `info`、各操作のパラメータは `debug`） |
+| `SYSTEM_MCP_LOG_FILE` | 出力先ファイル（`~` 展開可）。空文字でファイル出力オフ |
 
-`serve`（MCP）では `EVENTKITCTL_LOG_FILE` 未指定でも **`~/Library/Logs/eventkitctl.log`** に出力する
+`serve`（MCP）では `SYSTEM_MCP_LOG_FILE` 未指定でも **`~/Library/Logs/systemmcp.log`** に出力する
 （Claude Desktop から起動するとターミナルが無いため）。
 
 ```sh
 # CLI でファイルにも出す
-EVENTKITCTL_LOG=debug EVENTKITCTL_LOG_FILE=/tmp/ek.log ek reminders list --filter today
+SYSTEM_MCP_LOG=debug SYSTEM_MCP_LOG_FILE=/tmp/systemmcp.log systemmcp reminder reminders list --filter today
 
 # MCP のログを追う
-tail -f ~/Library/Logs/eventkitctl.log
+tail -f ~/Library/Logs/systemmcp.log
 ```
 
-Claude Desktop でレベルや出力先を変えたい場合は config に `env` を追加:
+Claude Desktop でレベルや出力先を変えたい場合は各エントリに `env` を追加:
 
 ```json
 {
   "mcpServers": {
-    "eventkitctl": {
-      "command": "/Users/mzp/ghq/github.com/mzp/eventkitctl/.build/release/eventkitctl",
-      "args": ["serve"],
-      "env": { "EVENTKITCTL_LOG": "debug" }
+    "apple-reminder": {
+      "command": "/Users/mzp/ghq/github.com/mzp/eventkitctl/.build/release/systemmcp",
+      "args": ["reminder", "serve"],
+      "env": { "SYSTEM_MCP_LOG": "debug" }
     }
   }
 }
@@ -148,13 +158,21 @@ Claude Desktop でレベルや出力先を変えたい場合は config に `env`
 
 ## 提供する MCP ツール
 
+**`systemmcp reminder serve`**（MCP サーバー名 `apple-reminder`、10 ツール）
+
 | ツール | 説明 |
 |---|---|
-| `get_status` | 認可状態 |
+| `get_status` | リマインダーの認可状態 |
 | `list_reminders` | リマインダー一覧（filter / 日付範囲 / list） |
 | `add_reminder` / `update_reminder` | 追加 / 編集 |
 | `complete_reminders` / `delete_reminders` | 完了 / 削除（複数可） |
 | `list_reminder_lists` / `create_reminder_list` / `rename_reminder_list` / `delete_reminder_list` | リスト管理 |
+
+**`systemmcp calendar serve`**（MCP サーバー名 `apple-calendar`、6 ツール）
+
+| ツール | 説明 |
+|---|---|
+| `get_status` | カレンダーの認可状態 |
 | `list_calendars` | カレンダー一覧 |
 | `list_events` | イベント一覧（期間） |
 | `add_event` / `update_event` / `delete_events` | 追加 / 編集 / 削除 |
@@ -162,12 +180,26 @@ Claude Desktop でレベルや出力先を変えたい場合は config に `env`
 ## 構成
 
 ```
-Sources/AppCore/   EventKit ラッパー(actor) + Codable レスポンス型 + 日付パース
-Sources/eventkitctl/    ArgumentParser の CLI + MCP serve
-  Commands/             status / reminders / lists / events / calendars
-  ToolDefinitions.swift MCP ツール定義とディスパッチ
-  MCPServer.swift       serve サブコマンド
-Resources/Info.plist    TCC 用 usage description（バイナリへ埋め込み）
+Sources/SystemMCPCore/       ドメインロジックを含む共有ライブラリ
+  EventKit/                  EventKit ラッパーの共有部
+    EventKitService.swift    actor（認証・カレンダー検索）
+    EventKitError.swift / StatusResponse.swift   エラー型・認可状態 DTO
+  Reminder/                  reminder ドメイン
+    EventKitService+Reminders.swift  reminder/list メソッド（extension）+ ReminderFilter
+    ReminderResponse.swift / ReminderPriority.swift
+  Calendar/                  event ドメイン
+    EventKitService+Events.swift     event/calendar メソッド（extension）
+    EventResponse.swift / CalendarResponse.swift
+  DateParsing.swift          日付パース / JSON encoder・decoder
+  Logging.swift / ProcessName.swift   ロガー・実行名
+  MCPSupport.swift           MCP/CLI 共通ヘルパー（schema builder・JSON 出力など）
+Sources/SystemMCP/             systemmcp（薄い CLI/MCP 層）
+  Main.swift                 ルート systemmcp（subcommands: reminder / calendar）
+  Reminder/                  ReminderCommand + status/reminders/lists/serve + ReminderMCP
+  Calendar/                  CalendarCommand + status/events/calendars/serve + CalendarMCP
+Resources/Info.plist         TCC usage description（リマインダー + カレンダー、埋め込み）
 ```
 
-CLI と MCP は同じ `EventStoreService`（actor）を共有し、ロジックを二重実装しない。
+ドメインロジック（`EventKitService` の各メソッドとレスポンス型）は `SystemMCPCore` の
+`Reminder/` `Calendar/` 配下に集約し、`SystemMCP` は CLI 引数と MCP ツールを Service につなぐだけの
+薄い層に徹する。CLI と MCP は同じ Service を共有し、ロジックを二重実装しない。

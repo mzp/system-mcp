@@ -1,5 +1,5 @@
 import ArgumentParser
-import AppCore
+import SystemMCPCore
 import Foundation
 
 struct ListsCommand: AsyncParsableCommand {

@@ -1,10 +1,10 @@
-BINARY := eventkitctl
+BINARY := systemmcp
 RELEASE_BIN := .build/release/$(BINARY)
 # Override with a Developer ID identity for a persistent TCC grant, e.g.
 #   make sign SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
 SIGN_IDENTITY ?= -
 
-.PHONY: build release sign install clean run-serve
+.PHONY: build release sign install clean run-reminder-serve run-calendar-serve
 
 build:
 	swift build
@@ -22,10 +22,13 @@ sign: release
 # Build, sign, and print the absolute path to use in claude_desktop_config.json.
 install: sign
 	@echo "Binary ready at: $(abspath $(RELEASE_BIN))"
-	@echo "Run it once to grant permissions: $(abspath $(RELEASE_BIN)) status"
+	@echo "Grant permissions once: $(abspath $(RELEASE_BIN)) reminder status && $(abspath $(RELEASE_BIN)) calendar status"
 
 clean:
 	swift package clean
 
-run-serve: build
-	.build/debug/$(BINARY) serve
+run-reminder-serve: build
+	.build/debug/$(BINARY) reminder serve
+
+run-calendar-serve: build
+	.build/debug/$(BINARY) calendar serve

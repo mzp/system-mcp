@@ -3,16 +3,16 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>jp.mzp.eventkitctl</string>
+	<string>jp.mzp.systemmcp</string>
 	<key>CFBundleName</key>
-	<string>eventkitctl</string>
-	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>eventkitctl reads and writes your calendar events on your behalf.</string>
+	<string>systemmcp</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>eventkitctl reads and writes your reminders on your behalf.</string>
-	<key>NSCalendarsUsageDescription</key>
-	<string>eventkitctl reads and writes your calendar events on your behalf.</string>
+	<string>systemmcp reads and writes your reminders on your behalf.</string>
 	<key>NSRemindersUsageDescription</key>
-	<string>eventkitctl reads and writes your reminders on your behalf.</string>
+	<string>systemmcp reads and writes your reminders on your behalf.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>systemmcp reads and writes your calendar events on your behalf.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>systemmcp reads and writes your calendar events on your behalf.</string>
 </dict>
 </plist>

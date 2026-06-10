@@ -1,6 +1,5 @@
 import EventKit
 import Foundation
-import Logging
 
 /// Filter presets for listing reminders.
 public enum ReminderFilter: Sendable, Equatable {
@@ -28,88 +27,9 @@ public enum ReminderFilter: Sendable, Equatable {
     }
 }
 
-/// Thin actor wrapper around `EKEventStore`. All EventKit access is funnelled through
-/// here so the CLI and MCP layers only ever see Sendable response models.
-public actor EventStoreService {
-    private let store = EKEventStore()
+extension EventKitService {
 
-    public init() {}
-
-    // MARK: - Authorization
-
-    public func authorizationStatus() -> AuthorizationStatusResponse {
-        AuthorizationStatusResponse(
-            events: Self.statusName(EKEventStore.authorizationStatus(for: .event)),
-            reminders: Self.statusName(EKEventStore.authorizationStatus(for: .reminder)))
-    }
-
-    /// Requests access to both entity types (triggers the TCC prompt on first run) and
-    /// returns the resulting status.
-    @discardableResult
-    public func requestAccess() async -> AuthorizationStatusResponse {
-        if EKEventStore.authorizationStatus(for: .event) == .notDetermined {
-            _ = try? await store.requestFullAccessToEvents()
-        }
-        if EKEventStore.authorizationStatus(for: .reminder) == .notDetermined {
-            _ = try? await store.requestFullAccessToReminders()
-        }
-        let status = authorizationStatus()
-        log.info(
-            "authorization",
-            metadata: ["events": .string(status.events), "reminders": .string(status.reminders)])
-        return status
-    }
-
-    private func ensureRemindersAccess() async throws {
-        switch EKEventStore.authorizationStatus(for: .reminder) {
-        case .fullAccess:
-            return
-        case .notDetermined:
-            let granted = (try? await store.requestFullAccessToReminders()) ?? false
-            if !granted { throw EventKitError.accessDenied(entity: "reminders") }
-        default:
-            log.warning("reminders access denied", metadata: ["status": "\(EKEventStore.authorizationStatus(for: .reminder).rawValue)"])
-            throw EventKitError.accessDenied(entity: "reminders")
-        }
-    }
-
-    private func ensureEventsAccess() async throws {
-        switch EKEventStore.authorizationStatus(for: .event) {
-        case .fullAccess:
-            return
-        case .notDetermined:
-            let granted = (try? await store.requestFullAccessToEvents()) ?? false
-            if !granted { throw EventKitError.accessDenied(entity: "calendar events") }
-        default:
-            log.warning("calendar access denied", metadata: ["status": "\(EKEventStore.authorizationStatus(for: .event).rawValue)"])
-            throw EventKitError.accessDenied(entity: "calendar events")
-        }
-    }
-
-    private static func statusName(_ status: EKAuthorizationStatus) -> String {
-        switch status {
-        case .notDetermined: return "notDetermined"
-        case .restricted: return "restricted"
-        case .denied: return "denied"
-        case .fullAccess: return "fullAccess"
-        case .writeOnly: return "writeOnly"
-        case .authorized: return "authorized"
-        @unknown default: return "unknown"
-        }
-    }
-
-    // MARK: - Calendars / Lists
-
-    public func listCalendars() async throws -> [CalendarResponse] {
-        log.debug("listCalendars")
-        try await ensureEventsAccess()
-        let defaultId = store.defaultCalendarForNewEvents?.calendarIdentifier
-        let result = store.calendars(for: .event)
-            .map { CalendarResponse($0, defaultId: defaultId) }
-            .sorted { $0.title.localizedCompare($1.title) == .orderedAscending }
-        log.debug("listCalendars result", metadata: ["count": "\(result.count)"])
-        return result
-    }
+    // MARK: - Reminder lists
 
     public func listReminderLists() async throws -> [CalendarResponse] {
         log.debug("listReminderLists")
@@ -243,7 +163,7 @@ public actor EventStoreService {
             throw EventKitError.saveFailed("no default reminder list available; specify --list")
         }
         if let notes { reminder.notes = notes }
-        if let due { reminder.dueDateComponents = EventKitDate.dueComponents(from: due) }
+        if let due { reminder.dueDateComponents = DateParsing.dueComponents(from: due) }
         if let priority { reminder.priority = try Self.priorityValue(priority) }
         try save(reminder)
         log.info("reminder added", metadata: ["id": .string(reminder.calendarItemIdentifier)])
@@ -267,7 +187,7 @@ public actor EventStoreService {
         }
         if let title { reminder.title = title }
         if let list { reminder.calendar = try reminderCalendar(idOrName: list) }
-        if let due { reminder.dueDateComponents = EventKitDate.dueComponents(from: due) }
+        if let due { reminder.dueDateComponents = DateParsing.dueComponents(from: due) }
         if let notes { reminder.notes = notes }
         if let priority { reminder.priority = try Self.priorityValue(priority) }
         if let completed { reminder.isCompleted = completed }
@@ -305,97 +225,15 @@ public actor EventStoreService {
         }
     }
 
-    // MARK: - Events
-
-    public func fetchEvents(start: Date, end: Date, calendar: String? = nil) async throws -> [EventResponse] {
-        log.debug(
-            "fetchEvents",
-            metadata: ["start": "\(start)", "end": "\(end)", "calendar": .string(calendar ?? "*")])
-        try await ensureEventsAccess()
-        let calendars = try calendar.map { try [eventCalendar(idOrName: $0)] }
-        let predicate = store.predicateForEvents(withStart: start, end: end, calendars: calendars)
-        let result = store.events(matching: predicate)
-            .map(EventResponse.init)
-            .sorted { ($0.startDate ?? .distantPast) < ($1.startDate ?? .distantPast) }
-        log.debug("fetchEvents result", metadata: ["count": "\(result.count)"])
-        return result
-    }
-
-    public func addEvent(
-        title: String, calendar: String? = nil, start: Date, end: Date, isAllDay: Bool = false,
-        notes: String? = nil, location: String? = nil, url: String? = nil
-    ) async throws -> EventResponse {
-        log.debug(
-            "addEvent",
-            metadata: [
-                "title": .string(title), "calendar": .string(calendar ?? "<default>"),
-                "start": "\(start)", "end": "\(end)", "allDay": "\(isAllDay)",
-            ])
-        try await ensureEventsAccess()
-        let event = EKEvent(eventStore: store)
-        event.title = title
-        event.calendar = try calendar.map { try eventCalendar(idOrName: $0) }
-            ?? store.defaultCalendarForNewEvents
-        if event.calendar == nil {
-            throw EventKitError.saveFailed("no default calendar available; specify --calendar")
-        }
-        event.startDate = start
-        event.endDate = end
-        event.isAllDay = isAllDay
-        if let notes { event.notes = notes }
-        if let location { event.location = location }
-        if let url { event.url = URL(string: url) }
-        do {
-            try store.save(event, span: .thisEvent, commit: true)
-        } catch {
-            throw EventKitError.saveFailed(error.localizedDescription)
-        }
-        log.info("event added", metadata: ["id": .string(event.eventIdentifier ?? "")])
-        return EventResponse(event)
-    }
-
-    public func updateEvent(
-        id: String, title: String? = nil, calendar: String? = nil, start: Date? = nil,
-        end: Date? = nil, isAllDay: Bool? = nil, notes: String? = nil, location: String? = nil,
-        url: String? = nil
-    ) async throws -> EventResponse {
-        log.debug("updateEvent", metadata: ["id": .string(id)])
-        try await ensureEventsAccess()
-        guard let event = store.event(withIdentifier: id) else {
-            throw EventKitError.notFound("event \(id)")
-        }
-        if let title { event.title = title }
-        if let calendar { event.calendar = try eventCalendar(idOrName: calendar) }
-        if let start { event.startDate = start }
-        if let end { event.endDate = end }
-        if let isAllDay { event.isAllDay = isAllDay }
-        if let notes { event.notes = notes }
-        if let location { event.location = location }
-        if let url { event.url = URL(string: url) }
-        do {
-            try store.save(event, span: .thisEvent, commit: true)
-        } catch {
-            throw EventKitError.saveFailed(error.localizedDescription)
-        }
-        return EventResponse(event)
-    }
-
-    public func deleteEvents(ids: [String]) async throws {
-        log.info("deleteEvents", metadata: ["ids": .string(ids.joined(separator: ","))])
-        try await ensureEventsAccess()
-        for id in ids {
-            guard let event = store.event(withIdentifier: id) else {
-                throw EventKitError.notFound("event \(id)")
-            }
-            do {
-                try store.remove(event, span: .thisEvent, commit: true)
-            } catch {
-                throw EventKitError.removeFailed(error.localizedDescription)
-            }
-        }
-    }
-
     // MARK: - Helpers
+
+    private func ensureRemindersAccess() async throws {
+        try await ensureAccess(to: .reminder, label: "reminders")
+    }
+
+    private func reminderCalendar(idOrName: String) throws -> EKCalendar {
+        try calendar(idOrName: idOrName, entity: .reminder, label: "reminder list")
+    }
 
     private func save(_ reminder: EKReminder) throws {
         do {
@@ -411,25 +249,6 @@ public actor EventStoreService {
                 continuation.resume(returning: (reminders ?? []).map(ReminderResponse.init))
             }
         }
-    }
-
-    private func reminderCalendar(idOrName: String) throws -> EKCalendar {
-        try calendar(idOrName: idOrName, entity: .reminder, label: "reminder list")
-    }
-
-    private func eventCalendar(idOrName: String) throws -> EKCalendar {
-        try calendar(idOrName: idOrName, entity: .event, label: "calendar")
-    }
-
-    private func calendar(idOrName: String, entity: EKEntityType, label: String) throws -> EKCalendar {
-        let calendars = store.calendars(for: entity)
-        if let byId = calendars.first(where: { $0.calendarIdentifier == idOrName }) {
-            return byId
-        }
-        if let byName = calendars.first(where: { $0.title == idOrName }) {
-            return byName
-        }
-        throw EventKitError.notFound("\(label) '\(idOrName)'")
     }
 
     private static func priorityValue(_ string: String) throws -> Int {

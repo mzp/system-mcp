@@ -1,6 +1,6 @@
 import Foundation
 
-/// Errors surfaced by `EventStoreService`. The `description` is user-facing and is
+/// Errors surfaced by `EventKitService`. The `description` is user-facing and is
 /// what gets shown on the CLI and returned to MCP clients.
 public enum EventKitError: Error, CustomStringConvertible, LocalizedError, Sendable {
     case accessDenied(entity: String)
@@ -12,7 +12,7 @@ public enum EventKitError: Error, CustomStringConvertible, LocalizedError, Senda
     public var description: String {
         switch self {
         case .accessDenied(let entity):
-            return "Access to \(entity) is not granted. Run `eventkitctl status` once from a terminal and approve the prompt, then re-check System Settings → Privacy & Security."
+            return "Access to \(entity) is not granted. Run `\(executableName()) status` once from a terminal and approve the prompt, then re-check System Settings → Privacy & Security."
         case .notFound(let what):
             return "Not found: \(what)"
         case .invalidArgument(let msg):

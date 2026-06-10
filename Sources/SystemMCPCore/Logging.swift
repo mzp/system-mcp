@@ -9,15 +9,16 @@ import Logging
 ///     by Claude Desktop there is no terminal to watch, so logs are persisted to a file.
 ///
 /// Configuration via environment variables:
-///   - `EVENTKITCTL_LOG`      level: trace|debug|info|notice|warning|error|critical (default info)
-///   - `EVENTKITCTL_LOG_FILE` explicit log file path (`~` is expanded). Empty disables file logging.
+///   - `SYSTEM_MCP_LOG`      level: trace|debug|info|notice|warning|error|critical (default info)
+///   - `SYSTEM_MCP_LOG_FILE` explicit log file path (`~` is expanded). Empty disables file logging.
 ///
-/// If `EVENTKITCTL_LOG_FILE` is unset and the process is the MCP server (`serve`),
-/// logs default to `~/Library/Logs/eventkitctl.log`.
+/// The logger label and the default serve log file are derived from the running
+/// executable's name, so `apple-reminder` and `apple-calendar` log separately
+/// (`~/Library/Logs/apple-reminder.log` / `~/Library/Logs/apple-calendar.log`).
 public let log: Logger = {
     let level = levelFromEnvironment()
     let fileWriter = logFilePath().flatMap(FileLogWriter.init(path:))
-    var logger = Logger(label: "eventkitctl") { label in
+    var logger = Logger(label: executableName()) { label in
         var handlers: [any LogHandler] = [StreamLogHandler.standardError(label: label)]
         if let fileWriter {
             handlers.append(FileLogHandler(label: label, writer: fileWriter))
@@ -32,7 +33,7 @@ public let log: Logger = {
 }()
 
 private func levelFromEnvironment() -> Logger.Level {
-    guard let raw = ProcessInfo.processInfo.environment["EVENTKITCTL_LOG"],
+    guard let raw = ProcessInfo.processInfo.environment["SYSTEM_MCP_LOG"],
         let level = Logger.Level(rawValue: raw.lowercased())
     else {
         return .info
@@ -44,12 +45,12 @@ private func levelFromEnvironment() -> Logger.Level {
 /// when running as the MCP server (no terminal to read stderr).
 private func logFilePath() -> String? {
     let env = ProcessInfo.processInfo.environment
-    if let explicit = env["EVENTKITCTL_LOG_FILE"] {
+    if let explicit = env["SYSTEM_MCP_LOG_FILE"] {
         return explicit.isEmpty ? nil : (explicit as NSString).expandingTildeInPath
     }
     if CommandLine.arguments.dropFirst().contains("serve") {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        return home.appendingPathComponent("Library/Logs/eventkitctl.log").path
+        return home.appendingPathComponent("Library/Logs/\(executableName()).log").path
     }
     return nil
 }

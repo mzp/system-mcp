@@ -2,13 +2,13 @@
 import PackageDescription
 
 let package = Package(
-    name: "eventkitctl",
+    name: "SystemMCP",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "eventkitctl", targets: ["eventkitctl"]),
-        .library(name: "AppCore", targets: ["AppCore"]),
+        .executable(name: "systemmcp", targets: ["SystemMCP"]),
+        .library(name: "SystemMCPCore", targets: ["SystemMCPCore"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
@@ -16,16 +16,21 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
     ],
     targets: [
+        // Shared library: EventKit wrapper infrastructure, response models, logging,
+        // errors, date parsing, MCP/CLI helpers, and the reminder/calendar domain logic.
         .target(
-            name: "AppCore",
+            name: "SystemMCPCore",
             dependencies: [
-                .product(name: "Logging", package: "swift-log")
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "MCP", package: "swift-sdk"),
             ]
         ),
+        // systemmcp: single binary with `reminder` and `calendar` subcommands, each
+        // exposing a CLI and an MCP server (`systemmcp reminder serve` / `systemmcp calendar serve`).
         .executableTarget(
-            name: "eventkitctl",
+            name: "SystemMCP",
             dependencies: [
-                "AppCore",
+                "SystemMCPCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "MCP", package: "swift-sdk"),
             ],

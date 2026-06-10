@@ -1,8 +1,10 @@
 # TODO
 
-EventKit では実現できるが、まだ未対応の機能。実装するときは原則
-**「Service にメソッド/引数追加 → CLI サブコマンド → `allTools` と `handleToolCall`」**
-の3点セットで揃える（CLAUDE.md 参照）。日付パースの拡張は `DateParsing.swift` に集約。
+EventKit では実現できるが、まだ未対応の機能。実装するときは原則、該当ドメイン
+（リマインダー系は `systemmcp reminder`、イベント系は `systemmcp calendar`）で
+**「`SystemMCPCore` の `EventKitService` extension にメソッド/引数追加 → CLI サブコマンド →
+`ReminderMCP`/`CalendarMCP` の `tools` と `handle`」** の3点セットで揃える（CLAUDE.md 参照）。
+日付パースの拡張は `SystemMCPCore/DateParsing.swift` に集約。
 
 ## 優先度: 高（ユーザー要望）
 

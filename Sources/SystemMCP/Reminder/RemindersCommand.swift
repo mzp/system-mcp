@@ -1,5 +1,5 @@
 import ArgumentParser
-import AppCore
+import SystemMCPCore
 import Foundation
 
 struct RemindersCommand: AsyncParsableCommand {
@@ -102,11 +102,4 @@ func resolveFilter(filter: String, start: String?, end: String?) throws -> Remin
             "unknown filter '\(filter)'. Use today/tomorrow/week/overdue/upcoming/completed/all, or --start/--end.")
     }
     return preset
-}
-
-func parseDateOrThrow(_ string: String, field: String) throws -> Date {
-    guard let date = EventKitDate.parse(string) else {
-        throw EventKitError.invalidArgument("could not parse \(field) date: '\(string)'")
-    }
-    return date
 }
