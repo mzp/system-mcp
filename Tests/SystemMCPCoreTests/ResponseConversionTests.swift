@@ -37,6 +37,44 @@ import Testing
         #expect(response.priority == "high")
         #expect(response.url == "https://example.com/x")
         #expect(response.dueDate == due.date)
+        #expect(response.location == nil)  // no location alarm
+        #expect(response.proximity == nil)
+    }
+
+    @Test func convertsLocationAlarm() {
+        let store = EKEventStore()
+        let reminder = EKReminder(eventStore: store)
+        reminder.title = "牛乳を買う"
+
+        let structured = EKStructuredLocation(title: "東京都港区芝公園4-2-8")
+        structured.geoLocation = CLLocation(latitude: 35.6586, longitude: 139.7454)
+        structured.radius = 200
+        let alarm = EKAlarm()
+        alarm.structuredLocation = structured
+        alarm.proximity = .enter
+        reminder.addAlarm(alarm)
+
+        let response = ReminderResponse(reminder)
+        #expect(response.location == "東京都港区芝公園4-2-8")
+        #expect(response.latitude == 35.6586)
+        #expect(response.longitude == 139.7454)
+        #expect(response.proximity == "enter")
+        #expect(response.radius == 200)
+    }
+
+    @Test func zeroRadiusMeansSystemDefault() {
+        let store = EKEventStore()
+        let reminder = EKReminder(eventStore: store)
+        let structured = EKStructuredLocation(title: "Office")
+        structured.geoLocation = CLLocation(latitude: 35.0, longitude: 139.0)
+        let alarm = EKAlarm()
+        alarm.structuredLocation = structured
+        alarm.proximity = .leave
+        reminder.addAlarm(alarm)
+
+        let response = ReminderResponse(reminder)
+        #expect(response.proximity == "leave")
+        #expect(response.radius == nil)
     }
 
     @Test func handlesEmptyReminder() {

@@ -21,6 +21,10 @@ public func bool(_ description: String) -> Value {
     .object(["type": .string("boolean"), "description": .string(description)])
 }
 
+public func number(_ description: String) -> Value {
+    .object(["type": .string("number"), "description": .string(description)])
+}
+
 public func stringArray(_ description: String) -> Value {
     .object([
         "type": .string("array"),
@@ -34,6 +38,11 @@ public func stringArray(_ description: String) -> Value {
 extension Optional where Wrapped == [String: Value] {
     public func str(_ key: String) -> String? { self?[key]?.stringValue }
     public func bool(_ key: String) -> Bool? { self?[key]?.boolValue }
+    public func double(_ key: String) -> Double? {
+        // JSON numbers may decode as int (e.g. 100) or double (e.g. 100.5).
+        guard let value = self?[key] else { return nil }
+        return value.doubleValue ?? value.intValue.map(Double.init)
+    }
     public func strArray(_ key: String) -> [String]? {
         self?[key]?.arrayValue?.compactMap { $0.stringValue }
     }

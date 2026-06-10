@@ -31,6 +31,12 @@ import Testing
         #expect(schema?["type"]?.stringValue == "array")
         #expect(schema?["items"]?.objectValue?["type"]?.stringValue == "string")
     }
+
+    @Test func numberBuildsNumberSchema() {
+        let schema = number("radius in meters").objectValue
+        #expect(schema?["type"]?.stringValue == "number")
+        #expect(schema?["description"]?.stringValue == "radius in meters")
+    }
 }
 
 @Suite struct ArgumentAccessTests {
@@ -40,12 +46,20 @@ import Testing
         "ids": .array([.string("a"), .string("b")]),
         "mixed": .array([.string("a"), .int(1)]),
         "number": .int(42),
+        "fraction": .double(100.5),
     ]
 
     @Test func readsTypedValues() {
         #expect(args.str("title") == "buy milk")
         #expect(args.bool("flag") == true)
         #expect(args.strArray("ids") == ["a", "b"])
+    }
+
+    @Test func doubleReadsBothIntAndDouble() {
+        #expect(args.double("fraction") == 100.5)
+        #expect(args.double("number") == 42.0)  // JSON ints coerce to Double
+        #expect(args.double("title") == nil)
+        #expect(args.double("nope") == nil)
     }
 
     @Test func returnsNilForMissingOrMistypedKeys() {

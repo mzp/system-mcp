@@ -1,8 +1,8 @@
 import CoreLocation
 import Foundation
 
-/// Forward-geocodes a free-form location string into coordinates so events get a
-/// structured (map-backed) location, matching what Calendar.app does on input.
+/// Forward-geocodes a free-form location string into coordinates, used for event
+/// structured locations (map card in Calendar.app) and reminder location triggers.
 /// Forward geocoding needs network access but no location-services permission.
 enum Geocoder {
     static func coordinate(for query: String) async -> (latitude: Double, longitude: Double)? {

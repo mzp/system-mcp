@@ -40,11 +40,18 @@ struct RemindersCommand: AsyncParsableCommand {
         @Option(help: "Due date (ISO8601 or today/tomorrow).") var due: String?
         @Option(help: "Notes.") var notes: String?
         @Option(help: "Priority: none/low/medium/high.") var priority: String?
+        @Option(help: "Location trigger (address or place name; must geocode to coordinates).")
+        var location: String?
+        @Option(help: "Location trigger timing: enter (arrive) / leave (depart). Default: enter.")
+        var proximity: String?
+        @Option(help: "Location trigger radius in meters (system default if omitted).")
+        var radius: Double?
 
         func run() async throws {
             let dueDate = try due.map { try parseDateOrThrow($0, field: "due") }
             let reminder = try await service.addReminder(
-                title: title, list: list, due: dueDate, notes: notes, priority: priority)
+                title: title, list: list, due: dueDate, notes: notes, priority: priority,
+                location: location, proximity: proximity, radius: radius)
             Output.json(reminder)
         }
     }
@@ -59,12 +66,19 @@ struct RemindersCommand: AsyncParsableCommand {
         @Option(help: "New notes.") var notes: String?
         @Option(help: "Priority: none/low/medium/high.") var priority: String?
         @Flag(inversion: .prefixedNo, help: "Mark completed / not completed.") var completed: Bool?
+        @Option(help: "New location trigger (replaces the existing one; must geocode to coordinates).")
+        var location: String?
+        @Option(help: "Location trigger timing: enter (arrive) / leave (depart). Default: enter.")
+        var proximity: String?
+        @Option(help: "Location trigger radius in meters (system default if omitted).")
+        var radius: Double?
 
         func run() async throws {
             let dueDate = try due.map { try parseDateOrThrow($0, field: "due") }
             let reminder = try await service.updateReminder(
                 id: id, title: title, list: list, due: dueDate, notes: notes,
-                priority: priority, completed: completed)
+                priority: priority, completed: completed,
+                location: location, proximity: proximity, radius: radius)
             Output.json(reminder)
         }
     }

@@ -31,17 +31,21 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
     - `StatusResponse.swift` — 認可状態 DTO（`authorizationStatus`/`requestAccess` の戻り値、単一エンティティ）。
   - `Reminder/` — reminder ドメイン。
     - `EventKitService+Reminders.swift` — `extension EventKitService` に reminder/list の CRUD（`public`）と `ReminderFilter`。
-    - `ReminderResponse.swift` — `ReminderResponse` + EK 変換。
+      `location`/`proximity`/`radius` で場所トリガー付き `EKAlarm` をセット（座標解決できない location はエラー。
+      update 時は既存の場所アラームを置き換え、時刻ベースのアラームは保持）。
+    - `ReminderResponse.swift` — `ReminderResponse` + EK 変換（場所アラームの
+      `location`/`latitude`/`longitude`/`proximity`/`radius` も含む。radius 0 はシステム既定として nil）。
     - `ReminderPriority.swift` — `ReminderPriority`(none/low/medium/high ⇄ 0/1/5/9)。
+    - `AlarmProximity.swift` — `AlarmProximity`(enter/leave ⇄ `EKAlarmProximity`)。
   - `Calendar/` — event ドメイン。
     - `EventKitService+Events.swift` — `extension EventKitService` に event/calendar の CRUD（`public`）。
       location は `Geocoder` で座標解決して `EKStructuredLocation` をセット（解決不能ならテキストのみ）。
-    - `Geocoder.swift` — `CLGeocoder` による住所文字列→座標の前方ジオコーディング
-      （位置情報権限は不要・ネットワークは必要。失敗時は nil を返すだけでエラーにしない）。
     - `EventResponse.swift` — `EventResponse` + EK 変換（`latitude`/`longitude` は `structuredLocation` 由来）。
     - `CalendarResponse.swift` — カレンダー / リマインダーリスト両用のレスポンス型（`listCalendars` と `listReminderLists` が返す）。
   - ルート直下（ドメイン非依存）:
     - `DateParsing.swift` — `DateParsing.parse`（ISO8601 / `today`・`tomorrow`・`yesterday`）と共有 JSON encoder/decoder。
+    - `Geocoder.swift` — `CLGeocoder` による住所/地名→座標の前方ジオコーディング（event の構造化ロケーションと
+      reminder の場所トリガーの両方で使用。位置情報権限は不要・ネットワークは必要。失敗時は nil を返す）。
     - `Logging.swift` — 共有ロガー `log`。**stderr + 任意でファイル**に出力（stdout には絶対出さない）。
       ラベルと `serve` 時のデフォルトログファイルは**実行バイナリ名由来**（`~/Library/Logs/systemmcp.log`）。
       `SYSTEM_MCP_LOG`(レベル) / `SYSTEM_MCP_LOG_FILE`(出力先) で上書き可。

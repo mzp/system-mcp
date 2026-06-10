@@ -32,6 +32,10 @@ enum ReminderMCP {
                     "due": string("Due date, ISO8601 (2026-06-10T10:00) or today/tomorrow"),
                     "notes": string("Notes"),
                     "priority": string("none | low | medium | high"),
+                    "location": string(
+                        "Location trigger (address or place name; geocoded, must resolve to coordinates)"),
+                    "proximity": string("Location trigger timing: enter (arrive) | leave (depart); default enter"),
+                    "radius": number("Location trigger radius in meters (system default if omitted)"),
                 ], required: ["title"])),
         Tool(
             name: "update_reminder",
@@ -45,6 +49,10 @@ enum ReminderMCP {
                     "notes": string("New notes"),
                     "priority": string("none | low | medium | high"),
                     "completed": bool("Mark completed or not"),
+                    "location": string(
+                        "New location trigger (replaces the existing one; geocoded, must resolve to coordinates)"),
+                    "proximity": string("Location trigger timing: enter (arrive) | leave (depart); default enter"),
+                    "radius": number("Location trigger radius in meters (system default if omitted)"),
                 ], required: ["id"])),
         Tool(
             name: "complete_reminders",
@@ -102,7 +110,8 @@ enum ReminderMCP {
                 return jsonResult(
                     try await service.addReminder(
                         title: title, list: args.str("list"), due: due, notes: args.str("notes"),
-                        priority: args.str("priority")))
+                        priority: args.str("priority"), location: args.str("location"),
+                        proximity: args.str("proximity"), radius: args.double("radius")))
 
             case "update_reminder":
                 guard let id = args.str("id") else { return missing("id") }
@@ -111,7 +120,8 @@ enum ReminderMCP {
                     try await service.updateReminder(
                         id: id, title: args.str("title"), list: args.str("list"), due: due,
                         notes: args.str("notes"), priority: args.str("priority"),
-                        completed: args.bool("completed")))
+                        completed: args.bool("completed"), location: args.str("location"),
+                        proximity: args.str("proximity"), radius: args.double("radius")))
 
             case "complete_reminders":
                 guard let ids = args.strArray("ids") else { return missing("ids") }

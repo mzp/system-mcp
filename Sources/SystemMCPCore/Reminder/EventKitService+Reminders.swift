@@ -1,3 +1,4 @@
+import CoreLocation
 import EventKit
 import Foundation
 
@@ -146,13 +147,15 @@ extension EventKitService {
 
     public func addReminder(
         title: String, list: String? = nil, due: Date? = nil, notes: String? = nil,
-        priority: String? = nil
+        priority: String? = nil, location: String? = nil, proximity: String? = nil,
+        radius: Double? = nil
     ) async throws -> ReminderResponse {
         log.debug(
             "addReminder",
             metadata: [
                 "title": .string(title), "list": .string(list ?? "<default>"),
                 "due": "\(due as Any)", "priority": .string(priority ?? "none"),
+                "location": .string(location ?? "<none>"),
             ])
         try await ensureRemindersAccess()
         let reminder = EKReminder(eventStore: store)
@@ -166,6 +169,7 @@ extension EventKitService {
         if let notes { reminder.notes = notes }
         if let due { reminder.dueDateComponents = DateParsing.dueComponents(from: due) }
         if let priority { reminder.priority = try Self.priorityValue(priority) }
+        try await setLocationAlarm(on: reminder, location: location, proximity: proximity, radius: radius)
         try save(reminder)
         log.info("reminder added", metadata: ["id": .string(reminder.calendarItemIdentifier)])
         return ReminderResponse(reminder)
@@ -173,14 +177,15 @@ extension EventKitService {
 
     public func updateReminder(
         id: String, title: String? = nil, list: String? = nil, due: Date? = nil,
-        notes: String? = nil, priority: String? = nil, completed: Bool? = nil
+        notes: String? = nil, priority: String? = nil, completed: Bool? = nil,
+        location: String? = nil, proximity: String? = nil, radius: Double? = nil
     ) async throws -> ReminderResponse {
         log.debug(
             "updateReminder",
             metadata: [
                 "id": .string(id), "title": "\(title as Any)", "list": "\(list as Any)",
                 "due": "\(due as Any)", "priority": "\(priority as Any)",
-                "completed": "\(completed as Any)",
+                "completed": "\(completed as Any)", "location": "\(location as Any)",
             ])
         try await ensureRemindersAccess()
         guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else {
@@ -192,6 +197,7 @@ extension EventKitService {
         if let notes { reminder.notes = notes }
         if let priority { reminder.priority = try Self.priorityValue(priority) }
         if let completed { reminder.isCompleted = completed }
+        try await setLocationAlarm(on: reminder, location: location, proximity: proximity, radius: radius)
         try save(reminder)
         return ReminderResponse(reminder)
     }
@@ -242,6 +248,41 @@ extension EventKitService {
         } catch {
             throw EventKitError.saveFailed(error.localizedDescription)
         }
+    }
+
+    /// Sets a location-triggered alarm. Unlike event locations, a trigger is useless
+    /// without coordinates, so an un-geocodable location is an error here. A new
+    /// location replaces any existing location alarms; time-based alarms are kept.
+    private func setLocationAlarm(
+        on reminder: EKReminder, location: String?, proximity: String?, radius: Double?
+    ) async throws {
+        guard let location else {
+            if proximity != nil || radius != nil {
+                throw EventKitError.invalidArgument("proximity/radius require a location")
+            }
+            return
+        }
+        guard let proximityValue = AlarmProximity(string: proximity ?? AlarmProximity.enter.rawValue) else {
+            throw EventKitError.invalidArgument(
+                "proximity must be one of: \(AlarmProximity.allCases.map(\.rawValue).joined(separator: ", "))")
+        }
+        if let radius, radius <= 0 {
+            throw EventKitError.invalidArgument("radius must be a positive number of meters")
+        }
+        guard let coordinate = await Geocoder.coordinate(for: location) else {
+            throw EventKitError.invalidArgument(
+                "could not geocode location '\(location)'; a location trigger needs resolvable coordinates")
+        }
+        let structured = EKStructuredLocation(title: location)
+        structured.geoLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        if let radius { structured.radius = radius }
+        for alarm in reminder.alarms ?? [] where alarm.structuredLocation != nil {
+            reminder.removeAlarm(alarm)
+        }
+        let alarm = EKAlarm()
+        alarm.structuredLocation = structured
+        alarm.proximity = proximityValue.ekValue
+        reminder.addAlarm(alarm)
     }
 
     private func fetchReminderResponses(matching predicate: NSPredicate) async -> [ReminderResponse] {
