@@ -72,6 +72,22 @@ make install                    # release + 署名 + 絶対パス表示
 make sign SIGN_IDENTITY="Developer ID Application: ..."   # Developer ID 署名
 ```
 
+## テスト・フォーマット・lint
+
+```sh
+make test       # swift test（Tests/SystemMCPCoreTests、Swift Testing）
+make format     # swift format で Sources/Tests/Package.swift を整形
+make lint       # swift format lint --strict（指摘ゼロを維持する）
+```
+
+- テストは `SystemMCPCore` の純粋ロジック（DateParsing / MCPSupport / ReminderPriority /
+  EventKitError / ReminderFilter / Response 変換）が対象。EventKit オブジェクトは in-memory で
+  生成して変換のみ検証するため、**TCC 権限なしで実行できる**。`EventKitService` の実 CRUD は
+  権限が要るためテスト対象外。
+- formatter/linter は Swift 6 toolchain 同梱の `swift format`（外部ツール不要）。設定はルートの
+  `.swift-format`（4 スペースインデント・lineLength 120）。コードを変更したら `make format` を
+  かけ、`make lint` が通る状態を保つ。
+
 CLI/MCP の動作確認:
 
 ```sh

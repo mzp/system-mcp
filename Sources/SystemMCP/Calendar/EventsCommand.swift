@@ -1,6 +1,6 @@
 import ArgumentParser
-import SystemMCPCore
 import Foundation
+import SystemMCPCore
 
 struct EventsCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(

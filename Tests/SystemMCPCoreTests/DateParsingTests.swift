@@ -1,0 +1,110 @@
+import Foundation
+import Testing
+
+@testable import SystemMCPCore
+
+@Suite struct DateParsingTests {
+    private let calendar = Calendar.current
+
+    private func components(_ date: Date) -> DateComponents {
+        calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
+    }
+
+    @Test func parsesISO8601WithSeconds() throws {
+        let date = try #require(DateParsing.parse("2026-06-10T10:30:45"))
+        let c = components(date)
+        #expect(c.year == 2026)
+        #expect(c.month == 6)
+        #expect(c.day == 10)
+        #expect(c.hour == 10)
+        #expect(c.minute == 30)
+        #expect(c.second == 45)
+    }
+
+    @Test func parsesISO8601WithoutSeconds() throws {
+        let date = try #require(DateParsing.parse("2026-06-10T10:30"))
+        let c = components(date)
+        #expect(c.hour == 10)
+        #expect(c.minute == 30)
+        #expect(c.second == 0)
+    }
+
+    @Test func parsesSpaceSeparatedDateTime() throws {
+        let withSeconds = try #require(DateParsing.parse("2026-06-10 10:30:45"))
+        let withoutSeconds = try #require(DateParsing.parse("2026-06-10 10:30"))
+        #expect(components(withSeconds).second == 45)
+        #expect(components(withoutSeconds).minute == 30)
+    }
+
+    @Test func parsesDateOnlyAsStartOfDay() throws {
+        let date = try #require(DateParsing.parse("2026-06-10"))
+        let c = components(date)
+        #expect(c.year == 2026)
+        #expect(c.month == 6)
+        #expect(c.day == 10)
+        #expect(c.hour == 0)
+        #expect(c.minute == 0)
+    }
+
+    @Test func parsesRelativeKeywords() throws {
+        let today = try #require(DateParsing.parse("today"))
+        let tomorrow = try #require(DateParsing.parse("tomorrow"))
+        let yesterday = try #require(DateParsing.parse("yesterday"))
+
+        let startOfToday = calendar.startOfDay(for: Date())
+        #expect(today == startOfToday)
+        #expect(tomorrow == calendar.date(byAdding: .day, value: 1, to: startOfToday))
+        #expect(yesterday == calendar.date(byAdding: .day, value: -1, to: startOfToday))
+    }
+
+    @Test func relativeKeywordsAreCaseInsensitive() {
+        #expect(DateParsing.parse("Today") != nil)
+        #expect(DateParsing.parse("TOMORROW") != nil)
+    }
+
+    @Test func trimsWhitespace() throws {
+        let date = try #require(DateParsing.parse("  2026-06-10  "))
+        #expect(components(date).day == 10)
+    }
+
+    @Test(arguments: ["", "   ", "not a date", "2026/06/10", "10:30", "2026-13-45"])
+    func rejectsInvalidInput(_ input: String) {
+        #expect(DateParsing.parse(input) == nil)
+    }
+
+    @Test func dueComponentsKeepDownToMinute() throws {
+        let date = try #require(DateParsing.parse("2026-06-10T10:30:45"))
+        let due = DateParsing.dueComponents(from: date)
+        #expect(due.year == 2026)
+        #expect(due.month == 6)
+        #expect(due.day == 10)
+        #expect(due.hour == 10)
+        #expect(due.minute == 30)
+        #expect(due.second == nil)
+    }
+
+    @Test func jsonEncoderUsesISO8601AndSortedKeys() throws {
+        struct Sample: Codable {
+            let b: Date
+            let a: String
+        }
+        let date = Date(timeIntervalSince1970: 0)
+        let data = try DateParsing.jsonEncoder.encode(Sample(b: date, a: "x"))
+        let json = String(decoding: data, as: UTF8.self)
+        #expect(json.contains("1970-01-01T00:00:00Z"))
+        // sortedKeys: "a" must appear before "b"
+        let aIndex = try #require(json.range(of: "\"a\"")?.lowerBound)
+        let bIndex = try #require(json.range(of: "\"b\"")?.lowerBound)
+        #expect(aIndex < bIndex)
+    }
+
+    @Test func jsonDecoderRoundTripsEncoderOutput() throws {
+        struct Sample: Codable, Equatable {
+            let date: Date
+        }
+        let original = Sample(date: Date(timeIntervalSince1970: 1_750_000_000))
+        let data = try DateParsing.jsonEncoder.encode(original)
+        let decoded = try DateParsing.jsonDecoder.decode(Sample.self, from: data)
+        #expect(decoded == original)
+    }
+}

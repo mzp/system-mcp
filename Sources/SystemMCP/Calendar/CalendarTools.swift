@@ -1,7 +1,7 @@
-import SystemMCPCore
 import Foundation
 import Logging
 import MCP
+import SystemMCPCore
 
 /// MCP tool definitions and dispatch for the Calendar server (`systemmcp calendar serve`).
 enum CalendarMCP {
@@ -21,44 +21,48 @@ enum CalendarMCP {
         Tool(
             name: "list_events",
             description: "List calendar events within a date range.",
-            inputSchema: object([
-                "start": string("Range start, ISO8601 or today/tomorrow"),
-                "end": string("Range end, ISO8601 or today/tomorrow"),
-                "calendar": string("Restrict to a calendar (name or id)"),
-            ], required: ["start", "end"])),
+            inputSchema: object(
+                [
+                    "start": string("Range start, ISO8601 or today/tomorrow"),
+                    "end": string("Range end, ISO8601 or today/tomorrow"),
+                    "calendar": string("Restrict to a calendar (name or id)"),
+                ], required: ["start", "end"])),
         Tool(
             name: "add_event",
             description: "Create a calendar event.",
-            inputSchema: object([
-                "title": string("Event title"),
-                "calendar": string("Calendar name or id (default calendar if omitted)"),
-                "start": string("Start, ISO8601 (2026-06-10T10:00) or today/tomorrow"),
-                "end": string("End, ISO8601 or today/tomorrow"),
-                "allDay": bool("All-day event"),
-                "notes": string("Notes"),
-                "location": string("Location"),
-                "url": string("URL"),
-            ], required: ["title", "start", "end"])),
+            inputSchema: object(
+                [
+                    "title": string("Event title"),
+                    "calendar": string("Calendar name or id (default calendar if omitted)"),
+                    "start": string("Start, ISO8601 (2026-06-10T10:00) or today/tomorrow"),
+                    "end": string("End, ISO8601 or today/tomorrow"),
+                    "allDay": bool("All-day event"),
+                    "notes": string("Notes"),
+                    "location": string("Location"),
+                    "url": string("URL"),
+                ], required: ["title", "start", "end"])),
         Tool(
             name: "update_event",
             description: "Update an event by id. Only provided fields change.",
-            inputSchema: object([
-                "id": string("Event id (eventIdentifier)"),
-                "title": string("New title"),
-                "calendar": string("Move to calendar (name or id)"),
-                "start": string("New start, ISO8601 or today/tomorrow"),
-                "end": string("New end, ISO8601 or today/tomorrow"),
-                "allDay": bool("All-day event"),
-                "notes": string("New notes"),
-                "location": string("New location"),
-                "url": string("New URL"),
-            ], required: ["id"])),
+            inputSchema: object(
+                [
+                    "id": string("Event id (eventIdentifier)"),
+                    "title": string("New title"),
+                    "calendar": string("Move to calendar (name or id)"),
+                    "start": string("New start, ISO8601 or today/tomorrow"),
+                    "end": string("New end, ISO8601 or today/tomorrow"),
+                    "allDay": bool("All-day event"),
+                    "notes": string("New notes"),
+                    "location": string("New location"),
+                    "url": string("New URL"),
+                ], required: ["id"])),
         Tool(
             name: "delete_events",
             description: "Delete one or more events.",
-            inputSchema: object([
-                "ids": stringArray("Event ids")
-            ], required: ["ids"])),
+            inputSchema: object(
+                [
+                    "ids": stringArray("Event ids")
+                ], required: ["ids"])),
     ]
 
     static func handle(name: String, arguments args: [String: Value]?) async -> CallTool.Result {

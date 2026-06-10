@@ -24,7 +24,10 @@ public enum DateParsing {
         }
 
         for formatter in cachedFormatters {
-            if let date = formatter.date(from: trimmed) {
+            // Round-trip check: ICU accepts mismatched separators (e.g. "2026/06/10")
+            // even with isLenient = false, so reject anything that doesn't re-format
+            // to the exact input.
+            if let date = formatter.date(from: trimmed), formatter.string(from: date) == trimmed {
                 return date
             }
         }

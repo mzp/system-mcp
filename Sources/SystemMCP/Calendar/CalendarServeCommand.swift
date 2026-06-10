@@ -1,7 +1,7 @@
 import ArgumentParser
-import SystemMCPCore
 import Foundation
 import MCP
+import SystemMCPCore
 
 struct CalendarServeCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(

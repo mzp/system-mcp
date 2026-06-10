@@ -157,7 +157,8 @@ extension EventKitService {
         try await ensureRemindersAccess()
         let reminder = EKReminder(eventStore: store)
         reminder.title = title
-        reminder.calendar = try list.map { try reminderCalendar(idOrName: $0) }
+        reminder.calendar =
+            try list.map { try reminderCalendar(idOrName: $0) }
             ?? store.defaultCalendarForNewReminders()
         if reminder.calendar == nil {
             throw EventKitError.saveFailed("no default reminder list available; specify --list")
@@ -261,7 +262,7 @@ extension EventKitService {
 
     private static func reminderOrder(_ a: ReminderResponse, _ b: ReminderResponse) -> Bool {
         switch (a.dueDate, b.dueDate) {
-        case let (x?, y?) where x != y:
+        case (let x?, let y?) where x != y:
             return x < y
         case (nil, _?):
             return false

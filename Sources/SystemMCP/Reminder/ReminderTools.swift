@@ -1,7 +1,7 @@
-import SystemMCPCore
 import Foundation
 import Logging
 import MCP
+import SystemMCPCore
 
 /// MCP tool definitions and dispatch for the Reminders server (`systemmcp reminder serve`).
 enum ReminderMCP {
@@ -25,37 +25,41 @@ enum ReminderMCP {
         Tool(
             name: "add_reminder",
             description: "Create a reminder.",
-            inputSchema: object([
-                "title": string("Reminder title"),
-                "list": string("Reminder list name or id (default list if omitted)"),
-                "due": string("Due date, ISO8601 (2026-06-10T10:00) or today/tomorrow"),
-                "notes": string("Notes"),
-                "priority": string("none | low | medium | high"),
-            ], required: ["title"])),
+            inputSchema: object(
+                [
+                    "title": string("Reminder title"),
+                    "list": string("Reminder list name or id (default list if omitted)"),
+                    "due": string("Due date, ISO8601 (2026-06-10T10:00) or today/tomorrow"),
+                    "notes": string("Notes"),
+                    "priority": string("none | low | medium | high"),
+                ], required: ["title"])),
         Tool(
             name: "update_reminder",
             description: "Update a reminder by id. Only provided fields change.",
-            inputSchema: object([
-                "id": string("Reminder id (calendarItemIdentifier)"),
-                "title": string("New title"),
-                "list": string("Move to list (name or id)"),
-                "due": string("New due date, ISO8601 or today/tomorrow"),
-                "notes": string("New notes"),
-                "priority": string("none | low | medium | high"),
-                "completed": bool("Mark completed or not"),
-            ], required: ["id"])),
+            inputSchema: object(
+                [
+                    "id": string("Reminder id (calendarItemIdentifier)"),
+                    "title": string("New title"),
+                    "list": string("Move to list (name or id)"),
+                    "due": string("New due date, ISO8601 or today/tomorrow"),
+                    "notes": string("New notes"),
+                    "priority": string("none | low | medium | high"),
+                    "completed": bool("Mark completed or not"),
+                ], required: ["id"])),
         Tool(
             name: "complete_reminders",
             description: "Mark one or more reminders completed.",
-            inputSchema: object([
-                "ids": stringArray("Reminder ids")
-            ], required: ["ids"])),
+            inputSchema: object(
+                [
+                    "ids": stringArray("Reminder ids")
+                ], required: ["ids"])),
         Tool(
             name: "delete_reminders",
             description: "Delete one or more reminders.",
-            inputSchema: object([
-                "ids": stringArray("Reminder ids")
-            ], required: ["ids"])),
+            inputSchema: object(
+                [
+                    "ids": stringArray("Reminder ids")
+                ], required: ["ids"])),
 
         // Reminder lists
         Tool(
@@ -69,10 +73,11 @@ enum ReminderMCP {
         Tool(
             name: "rename_reminder_list",
             description: "Rename a reminder list.",
-            inputSchema: object([
-                "list": string("Existing list name or id"),
-                "newName": string("New name"),
-            ], required: ["list", "newName"])),
+            inputSchema: object(
+                [
+                    "list": string("Existing list name or id"),
+                    "newName": string("New name"),
+                ], required: ["list", "newName"])),
         Tool(
             name: "delete_reminder_list",
             description: "Delete a reminder list and its contents.",

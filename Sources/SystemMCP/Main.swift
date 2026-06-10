@@ -1,6 +1,6 @@
 import ArgumentParser
-import SystemMCPCore
 import Foundation
+import SystemMCPCore
 
 @main
 struct SystemMCPCommand: AsyncParsableCommand {

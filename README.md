@@ -48,6 +48,17 @@ Developer ID で署名したい場合:
 make sign SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
 ```
 
+## テストと lint
+
+```sh
+make test       # ユニットテスト（swift test、TCC 権限不要）
+make format     # swift format で整形
+make lint       # swift format lint --strict
+```
+
+formatter/linter は Swift toolchain 同梱の `swift format` を使う（外部ツールのインストール不要）。
+設定はルートの `.swift-format`。
+
 ## 権限の付与（初回のみ）
 
 各ドメインをターミナルから一度実行して、表示されるダイアログで許可する:

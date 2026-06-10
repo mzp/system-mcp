@@ -45,7 +45,8 @@ extension EventKitService {
         try await ensureEventsAccess()
         let event = EKEvent(eventStore: store)
         event.title = title
-        event.calendar = try calendar.map { try eventCalendar(idOrName: $0) }
+        event.calendar =
+            try calendar.map { try eventCalendar(idOrName: $0) }
             ?? store.defaultCalendarForNewEvents
         if event.calendar == nil {
             throw EventKitError.saveFailed("no default calendar available; specify --calendar")

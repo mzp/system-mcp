@@ -43,5 +43,11 @@ let package = Package(
                 ])
             ]
         ),
+        // Unit tests for the shared library (pure helpers and in-memory EventKit
+        // conversions only; no TCC permissions required).
+        .testTarget(
+            name: "SystemMCPCoreTests",
+            dependencies: ["SystemMCPCore"]
+        ),
     ]
 )

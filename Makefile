@@ -4,13 +4,22 @@ RELEASE_BIN := .build/release/$(BINARY)
 #   make sign SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
 SIGN_IDENTITY ?= -
 
-.PHONY: build release sign install clean run-reminder-serve run-calendar-serve
+.PHONY: build release test format lint sign install clean run-reminder-serve run-calendar-serve
 
 build:
 	swift build
 
 release:
 	swift build -c release
+
+test:
+	swift test
+
+format:
+	swift format format --in-place --recursive Sources Tests Package.swift
+
+lint:
+	swift format lint --strict --recursive Sources Tests Package.swift
 
 # Code-sign the built binary so TCC can attribute and remember the permission grant.
 # The Info.plist is already embedded at link time (see Package.swift linkerSettings).
