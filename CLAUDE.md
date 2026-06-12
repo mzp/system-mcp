@@ -40,10 +40,15 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
   - `Calendar/` — event ドメイン。
     - `EventKitService+Events.swift` — `extension EventKitService` に event/calendar の CRUD（`public`）。
       location は `Geocoder` で座標解決して `EKStructuredLocation` をセット（解決不能ならテキストのみ）。
-    - `EventResponse.swift` — `EventResponse` + EK 変換（`latitude`/`longitude` は `structuredLocation` 由来）。
+      `timeZone` 指定時は `EKEvent.timeZone` にセット（add/update の `--timezone` / `timezone`。
+      日付文字列の解釈もそのゾーンで行う）。
+    - `EventResponse.swift` — `EventResponse` + EK 変換（`latitude`/`longitude` は `structuredLocation` 由来、
+      `timeZone` は `EKEvent.timeZone` の識別子）。
     - `CalendarResponse.swift` — カレンダー / リマインダーリスト両用のレスポンス型（`listCalendars` と `listReminderLists` が返す）。
   - ルート直下（ドメイン非依存）:
-    - `DateParsing.swift` — `DateParsing.parse`（ISO8601 / `today`・`tomorrow`・`yesterday`）と共有 JSON encoder/decoder。
+    - `DateParsing.swift` — `DateParsing.parse`（ISO8601 / オフセット付き ISO8601 / `today`・`tomorrow`・`yesterday`。
+      `timeZone:` でオフセットなし入力の解釈ゾーンを指定可、既定はローカル）、
+      `DateParsing.timeZone(from:)`（IANA 名・略称→`TimeZone`）と共有 JSON encoder/decoder。
     - `Geocoder.swift` — `CLGeocoder` による住所/地名→座標の前方ジオコーディング（event の構造化ロケーションと
       reminder の場所トリガーの両方で使用。位置情報権限は不要・ネットワークは必要。失敗時は nil を返す）。
     - `Logging.swift` — 共有ロガー `log`。**stderr + 任意でファイル**に出力（stdout には絶対出さない）。
@@ -51,7 +56,7 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
       `SYSTEM_MCP_LOG`(レベル) / `SYSTEM_MCP_LOG_FILE`(出力先) で上書き可。
     - `ProcessName.swift` — `executableName()`（`CommandLine.arguments[0]` の basename）。
     - `MCPSupport.swift` — MCP/CLI ヘルパー（JSON Schema builder `object/string/bool/stringArray`、
-      `jsonResult/errorResult/missing`、引数アクセサ、`Output.json`、`parseDateOrThrow`）。
+      `jsonResult/errorResult/missing`、引数アクセサ、`Output.json`、`parseDateOrThrow`、`parseTimeZoneOrThrow`）。
 - **`Sources/SystemMCP/`** — `systemmcp` 実行ファイル（薄い CLI/MCP 層）。
   - `Main.swift` — `@main struct SystemMCPCommand`、commandName `systemmcp`、subcommands `reminder` / `calendar`、
     グローバル `service`（両ドメイン共用の単一 actor インスタンス）。

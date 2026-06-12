@@ -123,6 +123,13 @@ import Testing
         #expect(response.status == nil)  // EKEventStatus.none -> nil
     }
 
+    @Test func convertsTimeZone() {
+        let store = EKEventStore()
+        let event = EKEvent(eventStore: store)
+        event.timeZone = TimeZone(identifier: "America/New_York")
+        #expect(EventResponse(event).timeZone == "America/New_York")
+    }
+
     @Test func convertsStructuredLocationCoordinates() {
         let store = EKEventStore()
         let event = EKEvent(eventStore: store)
@@ -144,6 +151,7 @@ import Testing
         #expect(response.calendar == "")
         #expect(response.startDate == nil)
         #expect(response.endDate == nil)
+        #expect(response.timeZone == TimeZone.current.identifier)  // EKEvent defaults to the local zone
         #expect(response.status == nil)
     }
 }

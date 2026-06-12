@@ -127,4 +127,27 @@ import Testing
             return message.contains("start") && message.contains("garbage")
         }
     }
+
+    @Test func parsesInGivenTimeZone() throws {
+        let utc = try #require(TimeZone(identifier: "UTC"))
+        let date = try parseDateOrThrow("2026-06-10T10:00", field: "start", timeZone: utc)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = utc
+        #expect(calendar.dateComponents([.hour], from: date).hour == 10)
+    }
+}
+
+@Suite struct ParseTimeZoneOrThrowTests {
+    @Test func returnsResolvedTimeZone() throws {
+        #expect(try parseTimeZoneOrThrow("America/New_York").identifier == "America/New_York")
+    }
+
+    @Test func throwsInvalidArgumentNamingTheInput() {
+        #expect {
+            try parseTimeZoneOrThrow("Mars/Olympus")
+        } throws: { error in
+            guard case EventKitError.invalidArgument(let message) = error else { return false }
+            return message.contains("Mars/Olympus")
+        }
+    }
 }

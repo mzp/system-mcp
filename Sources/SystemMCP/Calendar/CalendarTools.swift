@@ -26,6 +26,9 @@ enum CalendarMCP {
                     "start": string("Range start, ISO8601 or today/tomorrow"),
                     "end": string("Range end, ISO8601 or today/tomorrow"),
                     "calendar": string("Restrict to a calendar (name or id)"),
+                    "timezone": string(
+                        "Time zone for interpreting start/end (IANA name like America/New_York, or EST; local time if omitted)"
+                    ),
                 ], required: ["start", "end"])),
         Tool(
             name: "add_event",
@@ -36,6 +39,10 @@ enum CalendarMCP {
                     "calendar": string("Calendar name or id (default calendar if omitted)"),
                     "start": string("Start, ISO8601 (2026-06-10T10:00) or today/tomorrow"),
                     "end": string("End, ISO8601 or today/tomorrow"),
+                    "timezone": string(
+                        "Time zone of the event (IANA name like America/New_York, or EST). "
+                            + "Start/end without an explicit offset are interpreted in this zone; local time if omitted"
+                    ),
                     "allDay": bool("All-day event"),
                     "notes": string("Notes"),
                     "location": string("Location (address or place name; geocoded to map coordinates when resolvable)"),
@@ -51,6 +58,9 @@ enum CalendarMCP {
                     "calendar": string("Move to calendar (name or id)"),
                     "start": string("New start, ISO8601 or today/tomorrow"),
                     "end": string("New end, ISO8601 or today/tomorrow"),
+                    "timezone": string(
+                        "New time zone of the event (IANA name like America/New_York, or EST). "
+                            + "Start/end without an explicit offset are interpreted in this zone"),
                     "allDay": bool("All-day event"),
                     "notes": string("New notes"),
                     "location": string(
@@ -79,33 +89,41 @@ enum CalendarMCP {
             case "list_events":
                 guard let start = args.str("start") else { return missing("start") }
                 guard let end = args.str("end") else { return missing("end") }
+                let zone = try args.str("timezone").map(parseTimeZoneOrThrow) ?? .current
                 return jsonResult(
                     try await service.fetchEvents(
-                        start: try parseDateOrThrow(start, field: "start"),
-                        end: try parseDateOrThrow(end, field: "end"),
+                        start: try parseDateOrThrow(start, field: "start", timeZone: zone),
+                        end: try parseDateOrThrow(end, field: "end", timeZone: zone),
                         calendar: args.str("calendar")))
 
             case "add_event":
                 guard let title = args.str("title") else { return missing("title") }
                 guard let start = args.str("start") else { return missing("start") }
                 guard let end = args.str("end") else { return missing("end") }
+                let zone = try args.str("timezone").map(parseTimeZoneOrThrow)
                 return jsonResult(
                     try await service.addEvent(
                         title: title, calendar: args.str("calendar"),
-                        start: try parseDateOrThrow(start, field: "start"),
-                        end: try parseDateOrThrow(end, field: "end"),
+                        start: try parseDateOrThrow(start, field: "start", timeZone: zone ?? .current),
+                        end: try parseDateOrThrow(end, field: "end", timeZone: zone ?? .current),
                         isAllDay: args.bool("allDay") ?? false, notes: args.str("notes"),
-                        location: args.str("location"), url: args.str("url")))
+                        location: args.str("location"), url: args.str("url"), timeZone: zone))
 
             case "update_event":
                 guard let id = args.str("id") else { return missing("id") }
-                let start = try args.str("start").map { try parseDateOrThrow($0, field: "start") }
-                let end = try args.str("end").map { try parseDateOrThrow($0, field: "end") }
+                let zone = try args.str("timezone").map(parseTimeZoneOrThrow)
+                let start = try args.str("start").map {
+                    try parseDateOrThrow($0, field: "start", timeZone: zone ?? .current)
+                }
+                let end = try args.str("end").map {
+                    try parseDateOrThrow($0, field: "end", timeZone: zone ?? .current)
+                }
                 return jsonResult(
                     try await service.updateEvent(
                         id: id, title: args.str("title"), calendar: args.str("calendar"),
                         start: start, end: end, isAllDay: args.bool("allDay"),
-                        notes: args.str("notes"), location: args.str("location"), url: args.str("url")))
+                        notes: args.str("notes"), location: args.str("location"), url: args.str("url"),
+                        timeZone: zone))
 
             case "delete_events":
                 guard let ids = args.strArray("ids") else { return missing("ids") }

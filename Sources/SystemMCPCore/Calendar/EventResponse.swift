@@ -12,6 +12,7 @@ public struct EventResponse: Codable, Sendable {
     public let startDate: Date?
     public let endDate: Date?
     public let isAllDay: Bool
+    public let timeZone: String?
     public let location: String?
     public let latitude: Double?
     public let longitude: Double?
@@ -31,6 +32,7 @@ extension EventResponse {
         self.startDate = event.startDate
         self.endDate = event.endDate
         self.isAllDay = event.isAllDay
+        self.timeZone = event.timeZone?.identifier
         self.location = event.location
         let coordinate = event.structuredLocation?.geoLocation?.coordinate
         self.latitude = coordinate?.latitude

@@ -35,13 +35,14 @@ extension EventKitService {
 
     public func addEvent(
         title: String, calendar: String? = nil, start: Date, end: Date, isAllDay: Bool = false,
-        notes: String? = nil, location: String? = nil, url: String? = nil
+        notes: String? = nil, location: String? = nil, url: String? = nil, timeZone: TimeZone? = nil
     ) async throws -> EventResponse {
         log.debug(
             "addEvent",
             metadata: [
                 "title": .string(title), "calendar": .string(calendar ?? "<default>"),
                 "start": "\(start)", "end": "\(end)", "allDay": "\(isAllDay)",
+                "timeZone": .string(timeZone?.identifier ?? "<floating>"),
             ])
         try await ensureEventsAccess()
         let event = EKEvent(eventStore: store)
@@ -55,6 +56,7 @@ extension EventKitService {
         event.startDate = start
         event.endDate = end
         event.isAllDay = isAllDay
+        if let timeZone { event.timeZone = timeZone }
         if let notes { event.notes = notes }
         if let location { event.structuredLocation = await structuredLocation(for: location) }
         if let url { event.url = URL(string: url) }
@@ -70,7 +72,7 @@ extension EventKitService {
     public func updateEvent(
         id: String, title: String? = nil, calendar: String? = nil, start: Date? = nil,
         end: Date? = nil, isAllDay: Bool? = nil, notes: String? = nil, location: String? = nil,
-        url: String? = nil
+        url: String? = nil, timeZone: TimeZone? = nil
     ) async throws -> EventResponse {
         log.debug("updateEvent", metadata: ["id": .string(id)])
         try await ensureEventsAccess()
@@ -82,6 +84,7 @@ extension EventKitService {
         if let start { event.startDate = start }
         if let end { event.endDate = end }
         if let isAllDay { event.isAllDay = isAllDay }
+        if let timeZone { event.timeZone = timeZone }
         if let notes { event.notes = notes }
         if let location { event.structuredLocation = await structuredLocation(for: location) }
         if let url { event.url = URL(string: url) }

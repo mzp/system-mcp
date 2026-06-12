@@ -87,9 +87,17 @@ public enum Output {
 
 // MARK: - Date parsing
 
-public func parseDateOrThrow(_ string: String, field: String) throws -> Date {
-    guard let date = DateParsing.parse(string) else {
+public func parseDateOrThrow(_ string: String, field: String, timeZone: TimeZone = .current) throws -> Date {
+    guard let date = DateParsing.parse(string, timeZone: timeZone) else {
         throw EventKitError.invalidArgument("could not parse \(field) date: '\(string)'")
     }
     return date
+}
+
+public func parseTimeZoneOrThrow(_ string: String) throws -> TimeZone {
+    guard let zone = DateParsing.timeZone(from: string) else {
+        throw EventKitError.invalidArgument(
+            "unknown time zone: '\(string)' (use an IANA name like America/New_York or an abbreviation like EST)")
+    }
+    return zone
 }

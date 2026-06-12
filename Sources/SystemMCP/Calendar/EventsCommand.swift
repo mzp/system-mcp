@@ -15,10 +15,13 @@ struct EventsCommand: AsyncParsableCommand {
         @Option(help: "Range start (ISO8601 or today/tomorrow).") var start: String
         @Option(help: "Range end (ISO8601 or today/tomorrow).") var end: String
         @Option(help: "Restrict to a calendar (name or id).") var calendar: String?
+        @Option(help: "Time zone for interpreting start/end (IANA name like America/New_York, or EST).")
+        var timezone: String?
 
         func run() async throws {
-            let startDate = try parseDateOrThrow(start, field: "start")
-            let endDate = try parseDateOrThrow(end, field: "end")
+            let zone = try timezone.map(parseTimeZoneOrThrow) ?? .current
+            let startDate = try parseDateOrThrow(start, field: "start", timeZone: zone)
+            let endDate = try parseDateOrThrow(end, field: "end", timeZone: zone)
             let events = try await service.fetchEvents(
                 start: startDate, end: endDate, calendar: calendar)
             Output.json(events)
@@ -37,13 +40,20 @@ struct EventsCommand: AsyncParsableCommand {
         @Option(help: "Location (address or place name; geocoded to map coordinates when resolvable).")
         var location: String?
         @Option(help: "URL.") var url: String?
+        @Option(
+            help: """
+                Time zone of the event (IANA name like America/New_York, or EST). \
+                Start/end without an explicit offset are interpreted in this zone.
+                """)
+        var timezone: String?
 
         func run() async throws {
-            let startDate = try parseDateOrThrow(start, field: "start")
-            let endDate = try parseDateOrThrow(end, field: "end")
+            let zone = try timezone.map(parseTimeZoneOrThrow)
+            let startDate = try parseDateOrThrow(start, field: "start", timeZone: zone ?? .current)
+            let endDate = try parseDateOrThrow(end, field: "end", timeZone: zone ?? .current)
             let event = try await service.addEvent(
                 title: title, calendar: calendar, start: startDate, end: endDate,
-                isAllDay: allDay, notes: notes, location: location, url: url)
+                isAllDay: allDay, notes: notes, location: location, url: url, timeZone: zone)
             Output.json(event)
         }
     }
@@ -61,13 +71,20 @@ struct EventsCommand: AsyncParsableCommand {
         @Option(help: "New location (address or place name; geocoded to map coordinates when resolvable).")
         var location: String?
         @Option(help: "New URL.") var url: String?
+        @Option(
+            help: """
+                New time zone of the event (IANA name like America/New_York, or EST). \
+                Start/end without an explicit offset are interpreted in this zone.
+                """)
+        var timezone: String?
 
         func run() async throws {
-            let startDate = try start.map { try parseDateOrThrow($0, field: "start") }
-            let endDate = try end.map { try parseDateOrThrow($0, field: "end") }
+            let zone = try timezone.map(parseTimeZoneOrThrow)
+            let startDate = try start.map { try parseDateOrThrow($0, field: "start", timeZone: zone ?? .current) }
+            let endDate = try end.map { try parseDateOrThrow($0, field: "end", timeZone: zone ?? .current) }
             let event = try await service.updateEvent(
                 id: id, title: title, calendar: calendar, start: startDate, end: endDate,
-                isAllDay: allDay, notes: notes, location: location, url: url)
+                isAllDay: allDay, notes: notes, location: location, url: url, timeZone: zone)
             Output.json(event)
         }
     }

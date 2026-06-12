@@ -67,7 +67,10 @@ import Testing
         #expect(components(date).day == 10)
     }
 
-    @Test(arguments: ["", "   ", "not a date", "2026/06/10", "10:30", "2026-13-45"])
+    @Test(arguments: [
+        "", "   ", "not a date", "2026/06/10", "10:30", "2026-13-45",
+        "2026-06-10T10:00+9:00", "2026-06-10+09:00",
+    ])
     func rejectsInvalidInput(_ input: String) {
         #expect(DateParsing.parse(input) == nil)
     }
@@ -106,5 +109,72 @@ import Testing
         let data = try DateParsing.jsonEncoder.encode(original)
         let decoded = try DateParsing.jsonDecoder.decode(Sample.self, from: data)
         #expect(decoded == original)
+    }
+}
+
+@Suite struct DateParsingTimeZoneTests {
+    private let tokyo = TimeZone(identifier: "Asia/Tokyo")!
+    private let utc = TimeZone(identifier: "UTC")!
+
+    private func utcDate(
+        _ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0
+    ) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = utc
+        return calendar.date(
+            from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))!
+    }
+
+    @Test func naiveDateTimeIsInterpretedInGivenTimeZone() throws {
+        let date = try #require(DateParsing.parse("2026-06-10T10:00", timeZone: tokyo))
+        #expect(date == utcDate(2026, 6, 10, 1, 0))  // 10:00 JST == 01:00 UTC
+    }
+
+    @Test func dateOnlyResolvesToStartOfDayInGivenTimeZone() throws {
+        let date = try #require(DateParsing.parse("2026-06-10", timeZone: tokyo))
+        #expect(date == utcDate(2026, 6, 9, 15, 0))  // midnight JST == 15:00 UTC previous day
+    }
+
+    @Test func relativeKeywordUsesGivenTimeZone() throws {
+        let today = try #require(DateParsing.parse("today", timeZone: utc))
+        var calendar = Calendar.current
+        calendar.timeZone = utc
+        #expect(today == calendar.startOfDay(for: Date()))
+    }
+
+    @Test func parsesExplicitOffset() throws {
+        let withSeconds = try #require(DateParsing.parse("2026-06-10T10:00:00+09:00"))
+        let withoutSeconds = try #require(DateParsing.parse("2026-06-10T10:00+09:00"))
+        let zulu = try #require(DateParsing.parse("2026-06-10T10:00:00Z"))
+        #expect(withSeconds == utcDate(2026, 6, 10, 1, 0))
+        #expect(withoutSeconds == utcDate(2026, 6, 10, 1, 0))
+        #expect(zulu == utcDate(2026, 6, 10, 10, 0))
+    }
+
+    @Test func explicitOffsetWinsOverTimeZoneParameter() throws {
+        let date = try #require(DateParsing.parse("2026-06-10T10:00:00-05:00", timeZone: tokyo))
+        #expect(date == utcDate(2026, 6, 10, 15, 0))
+    }
+
+    @Test func defaultTimeZoneMatchesLocalParsing() throws {
+        let implicit = try #require(DateParsing.parse("2026-06-10T10:00"))
+        let explicit = try #require(DateParsing.parse("2026-06-10T10:00", timeZone: .current))
+        #expect(implicit == explicit)
+    }
+
+    @Test func resolvesTimeZoneFromIANAIdentifier() {
+        #expect(DateParsing.timeZone(from: "Asia/Tokyo")?.identifier == "Asia/Tokyo")
+        #expect(DateParsing.timeZone(from: "america/new_york")?.identifier == "America/New_York")
+    }
+
+    @Test func resolvesTimeZoneFromAbbreviation() {
+        // "JST" resolves as a legacy identifier (UTC+9); "est" only matches as an abbreviation.
+        #expect(DateParsing.timeZone(from: "JST")?.secondsFromGMT() == 9 * 3600)
+        #expect(DateParsing.timeZone(from: "est")?.identifier == "America/New_York")
+    }
+
+    @Test(arguments: ["", "   ", "Mars/Olympus", "XYZ"])
+    func rejectsUnknownTimeZone(_ input: String) {
+        #expect(DateParsing.timeZone(from: input) == nil)
     }
 }
