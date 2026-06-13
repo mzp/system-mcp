@@ -6,7 +6,7 @@ struct RemindersCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "reminders",
         abstract: "List and manage reminders.",
-        subcommands: [List.self, Add.self, Update.self, Complete.self, Delete.self]
+        subcommands: [List.self, Add.self, Update.self, Move.self, Complete.self, Delete.self]
     )
 
     struct List: AsyncParsableCommand {
@@ -61,7 +61,6 @@ struct RemindersCommand: AsyncParsableCommand {
 
         @Argument(help: "Reminder id (calendarItemIdentifier).") var id: String
         @Option(help: "New title.") var title: String?
-        @Option(help: "Move to list (name or id).") var list: String?
         @Option(help: "New due date (ISO8601 or today/tomorrow).") var due: String?
         @Option(help: "New notes.") var notes: String?
         @Option(help: "Priority: none/low/medium/high.") var priority: String?
@@ -76,9 +75,22 @@ struct RemindersCommand: AsyncParsableCommand {
         func run() async throws {
             let dueDate = try due.map { try parseDateOrThrow($0, field: "due") }
             let reminder = try await service.updateReminder(
-                id: id, title: title, list: list, due: dueDate, notes: notes,
+                id: id, title: title, due: dueDate, notes: notes,
                 priority: priority, completed: completed,
                 location: location, proximity: proximity, radius: radius)
+            Output.json(reminder)
+        }
+    }
+
+    struct Move: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Move a reminder to another list (preserves location triggers and other attributes).")
+
+        @Argument(help: "Reminder id (calendarItemIdentifier).") var id: String
+        @Option(help: "Destination list (name or id).") var list: String
+
+        func run() async throws {
+            let reminder = try await service.moveReminder(id: id, list: list)
             Output.json(reminder)
         }
     }

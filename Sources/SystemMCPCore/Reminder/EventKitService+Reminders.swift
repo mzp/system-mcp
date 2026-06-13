@@ -176,14 +176,14 @@ extension EventKitService {
     }
 
     public func updateReminder(
-        id: String, title: String? = nil, list: String? = nil, due: Date? = nil,
+        id: String, title: String? = nil, due: Date? = nil,
         notes: String? = nil, priority: String? = nil, completed: Bool? = nil,
         location: String? = nil, proximity: String? = nil, radius: Double? = nil
     ) async throws -> ReminderResponse {
         log.debug(
             "updateReminder",
             metadata: [
-                "id": .string(id), "title": "\(title as Any)", "list": "\(list as Any)",
+                "id": .string(id), "title": "\(title as Any)",
                 "due": "\(due as Any)", "priority": "\(priority as Any)",
                 "completed": "\(completed as Any)", "location": "\(location as Any)",
             ])
@@ -192,13 +192,38 @@ extension EventKitService {
             throw EventKitError.notFound("reminder \(id)")
         }
         if let title { reminder.title = title }
-        if let list { reminder.calendar = try reminderCalendar(idOrName: list) }
         if let due { reminder.dueDateComponents = DateParsing.dueComponents(from: due) }
         if let notes { reminder.notes = notes }
         if let priority { reminder.priority = try Self.priorityValue(priority) }
         if let completed { reminder.isCompleted = completed }
         try await setLocationAlarm(on: reminder, location: location, proximity: proximity, radius: radius)
         try save(reminder)
+        return ReminderResponse(reminder)
+    }
+
+    /// Moves a reminder to another list. Kept separate from `updateReminder` because a
+    /// reminder carrying a location alarm cannot change list in a single save: the geofence
+    /// is bound to the source it was registered under, so EventKit fails with error -3002.
+    /// We detach the location alarms, save the move, then re-register the geofence under the
+    /// destination list (the same path `addReminder` takes successfully). See bug.txt.
+    public func moveReminder(id: String, list: String) async throws -> ReminderResponse {
+        log.debug("moveReminder", metadata: ["id": .string(id), "list": .string(list)])
+        try await ensureRemindersAccess()
+        guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else {
+            throw EventKitError.notFound("reminder \(id)")
+        }
+        let destination = try reminderCalendar(idOrName: list)
+        if reminder.calendar?.calendarIdentifier == destination.calendarIdentifier {
+            return ReminderResponse(reminder)
+        }
+        let detachedAlarms = detachLocationAlarms(from: reminder)
+        reminder.calendar = destination
+        try save(reminder)
+        if !detachedAlarms.isEmpty {
+            for alarm in detachedAlarms { reminder.addAlarm(alarm) }
+            try save(reminder)
+        }
+        log.info("reminder moved", metadata: ["id": .string(reminder.calendarItemIdentifier)])
         return ReminderResponse(reminder)
     }
 
@@ -283,6 +308,25 @@ extension EventKitService {
         alarm.structuredLocation = structured
         alarm.proximity = proximityValue.ekValue
         reminder.addAlarm(alarm)
+    }
+
+    /// Removes the reminder's location alarms and returns fresh, equivalent copies. Used by
+    /// `moveReminder` to carry a geofence across a list (source) change: the original alarm
+    /// is bound to the old source, so it must be detached before the move and re-added after.
+    private func detachLocationAlarms(from reminder: EKReminder) -> [EKAlarm] {
+        var detached: [EKAlarm] = []
+        for alarm in reminder.alarms ?? [] {
+            guard let existing = alarm.structuredLocation else { continue }
+            let structured = EKStructuredLocation(title: existing.title ?? "")
+            structured.geoLocation = existing.geoLocation
+            structured.radius = existing.radius
+            let copy = EKAlarm()
+            copy.structuredLocation = structured
+            copy.proximity = alarm.proximity
+            detached.append(copy)
+            reminder.removeAlarm(alarm)
+        }
+        return detached
     }
 
     private func fetchReminderResponses(matching predicate: NSPredicate) async -> [ReminderResponse] {

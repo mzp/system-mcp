@@ -33,6 +33,9 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
     - `EventKitService+Reminders.swift` — `extension EventKitService` に reminder/list の CRUD（`public`）と `ReminderFilter`。
       `location`/`proximity`/`radius` で場所トリガー付き `EKAlarm` をセット（座標解決できない location はエラー。
       update 時は既存の場所アラームを置き換え、時刻ベースのアラームは保持）。
+      リスト変更は `updateReminder` ではなく専用の `moveReminder(id:list:)` で行う。場所アラーム付きの
+      リマインダーは「移動＋ジオフェンス保持」を 1 回の save でやると EventKit が -3002 で失敗するため、
+      アラームを detach → 移動を save → 移動先リストでアラームを付け直して save、の 2 段階で保存する。
     - `ReminderResponse.swift` — `ReminderResponse` + EK 変換（場所アラームの
       `location`/`latitude`/`longitude`/`proximity`/`radius` も含む。radius 0 はシステム既定として nil）。
     - `ReminderPriority.swift` — `ReminderPriority`(none/low/medium/high ⇄ 0/1/5/9)。
@@ -61,7 +64,7 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
   - `Main.swift` — `@main struct SystemMCPCommand`、commandName `systemmcp`、subcommands `reminder` / `calendar`、
     グローバル `service`（両ドメイン共用の単一 actor インスタンス）。
   - `Reminder/` — `ReminderCommand`（`reminder` 親）/ `ReminderStatusCommand` / `RemindersCommand`
-    （`resolveFilter` も）/ `ListsCommand` / `ReminderServeCommand` / `ReminderMCP`（`tools` + `handle`、10 個）。
+    （`resolveFilter` も）/ `ListsCommand` / `ReminderServeCommand` / `ReminderMCP`（`tools` + `handle`、11 個）。
   - `Calendar/` — `CalendarCommand`（`calendar` 親）/ `CalendarStatusCommand` / `EventsCommand` /
     `CalendarsCommand` / `CalendarServeCommand` / `CalendarMCP`（`tools` + `handle`、6 個）。
   - 型名の衝突を避けるため、ドメインごとに名前空間を分ける（`status`/`serve` は別型、MCP は enum `ReminderMCP`/`CalendarMCP`）。

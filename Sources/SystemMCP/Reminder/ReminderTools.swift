@@ -39,12 +39,11 @@ enum ReminderMCP {
                 ], required: ["title"])),
         Tool(
             name: "update_reminder",
-            description: "Update a reminder by id. Only provided fields change.",
+            description: "Update a reminder by id. Only provided fields change. To change list, use move_reminder.",
             inputSchema: object(
                 [
                     "id": string("Reminder id (calendarItemIdentifier)"),
                     "title": string("New title"),
-                    "list": string("Move to list (name or id)"),
                     "due": string("New due date, ISO8601 or today/tomorrow"),
                     "notes": string("New notes"),
                     "priority": string("none | low | medium | high"),
@@ -54,6 +53,15 @@ enum ReminderMCP {
                     "proximity": string("Location trigger timing: enter (arrive) | leave (depart); default enter"),
                     "radius": number("Location trigger radius in meters (system default if omitted)"),
                 ], required: ["id"])),
+        Tool(
+            name: "move_reminder",
+            description:
+                "Move a reminder to another list (name or id). Preserves location triggers and other attributes.",
+            inputSchema: object(
+                [
+                    "id": string("Reminder id (calendarItemIdentifier)"),
+                    "list": string("Destination list name or id"),
+                ], required: ["id", "list"])),
         Tool(
             name: "complete_reminders",
             description: "Mark one or more reminders completed.",
@@ -118,10 +126,15 @@ enum ReminderMCP {
                 let due = try args.str("due").map { try parseDateOrThrow($0, field: "due") }
                 return jsonResult(
                     try await service.updateReminder(
-                        id: id, title: args.str("title"), list: args.str("list"), due: due,
+                        id: id, title: args.str("title"), due: due,
                         notes: args.str("notes"), priority: args.str("priority"),
                         completed: args.bool("completed"), location: args.str("location"),
                         proximity: args.str("proximity"), radius: args.double("radius")))
+
+            case "move_reminder":
+                guard let id = args.str("id") else { return missing("id") }
+                guard let list = args.str("list") else { return missing("list") }
+                return jsonResult(try await service.moveReminder(id: id, list: list))
 
             case "complete_reminders":
                 guard let ids = args.strArray("ids") else { return missing("ids") }
