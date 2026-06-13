@@ -43,9 +43,23 @@ extension EventKitService {
         return result
     }
 
-    public func createReminderList(name: String) async throws -> CalendarResponse {
-        log.debug("createReminderList", metadata: ["name": .string(name)])
+    /// Creates a reminder list. By default a list whose title already exists is refused, so a
+    /// caller that hit a resolve failure doesn't accidentally create a duplicate (which then
+    /// makes the name ambiguous). Pass `force: true` to create a same-named list anyway — only
+    /// after explicit user confirmation, since duplicates are usually a mistake.
+    public func createReminderList(name: String, force: Bool = false) async throws -> CalendarResponse {
+        log.debug("createReminderList", metadata: ["name": .string(name), "force": "\(force)"])
         try await ensureRemindersAccess()
+        if !force {
+            let existing = store.calendars(for: .reminder).filter { $0.title == name }
+            if !existing.isEmpty {
+                throw EventKitError.invalidArgument(
+                    "a reminder list named '\(name)' already exists (id: "
+                        + existing.map(\.calendarIdentifier).joined(separator: ", ")
+                        + "). Use the existing list, or pass force to create a duplicate "
+                        + "(only with the user's explicit confirmation)")
+            }
+        }
         let calendar = EKCalendar(for: .reminder, eventStore: store)
         calendar.title = name
         guard
@@ -201,11 +215,12 @@ extension EventKitService {
         return ReminderResponse(reminder)
     }
 
-    /// Moves a reminder to another list. Kept separate from `updateReminder` because a
-    /// reminder carrying a location alarm cannot change list in a single save: the geofence
-    /// is bound to the source it was registered under, so EventKit fails with error -3002.
-    /// We detach the location alarms, save the move, then re-register the geofence under the
-    /// destination list (the same path `addReminder` takes successfully). See bug.txt.
+    /// Moves a reminder to another list. Tries an in-place `calendar` reassignment first
+    /// (lossless, keeps the id; this is the path that works within one account). When EventKit
+    /// refuses the move — notably for a shared list, where reassigning `calendar` fails with
+    /// reminderkit error -3002 even though the list is in the same account and writable — it
+    /// falls back to recreating the reminder in the destination and deleting the original.
+    /// The recreate path changes the reminder's id. See docs/eventkit.md.
     public func moveReminder(id: String, list: String) async throws -> ReminderResponse {
         log.debug("moveReminder", metadata: ["id": .string(id), "list": .string(list)])
         try await ensureRemindersAccess()
@@ -216,15 +231,88 @@ extension EventKitService {
         if reminder.calendar?.calendarIdentifier == destination.calendarIdentifier {
             return ReminderResponse(reminder)
         }
-        let detachedAlarms = detachLocationAlarms(from: reminder)
-        reminder.calendar = destination
-        try save(reminder)
-        if !detachedAlarms.isEmpty {
-            for alarm in detachedAlarms { reminder.addAlarm(alarm) }
-            try save(reminder)
+        guard destination.allowsContentModifications else {
+            throw EventKitError.invalidArgument(
+                "cannot move reminder into list '\(destination.title)': the list is read-only "
+                    + "(e.g. a shared list you do not have permission to edit)")
         }
-        log.info("reminder moved", metadata: ["id": .string(reminder.calendarItemIdentifier)])
-        return ReminderResponse(reminder)
+        do {
+            let detachedAlarms = detachLocationAlarms(from: reminder)
+            reminder.calendar = destination
+            try store.save(reminder, commit: true)
+            if !detachedAlarms.isEmpty {
+                for alarm in detachedAlarms { reminder.addAlarm(alarm) }
+                try store.save(reminder, commit: true)
+            }
+            log.info("reminder moved in place", metadata: ["id": .string(reminder.calendarItemIdentifier)])
+            return ReminderResponse(reminder)
+        } catch {
+            // EventKit rejected the in-place move (e.g. destination is a shared list). Discard
+            // the uncommitted mutations and move by recreate-then-delete instead.
+            log.warning(
+                "in-place move rejected; recreating in destination",
+                metadata: ["id": .string(id), "error": "\(error)"])
+            store.reset()
+            return try recreateForMove(originalId: id, into: list)
+        }
+    }
+
+    /// Performs a move by creating a fresh copy in the destination list, then deleting the
+    /// original. The copy is saved *before* the original is removed, so a failure to create
+    /// (e.g. EventKit also refuses writes to the destination) never loses the original.
+    private func recreateForMove(originalId: String, into list: String) throws -> ReminderResponse {
+        guard let original = store.calendarItem(withIdentifier: originalId) as? EKReminder else {
+            throw EventKitError.notFound("reminder \(originalId)")
+        }
+        let destination = try reminderCalendar(idOrName: list)
+        let copy = EKReminder(eventStore: store)
+        copy.calendar = destination
+        copy.title = original.title
+        copy.notes = original.notes
+        copy.priority = original.priority
+        copy.dueDateComponents = original.dueDateComponents
+        copy.startDateComponents = original.startDateComponents
+        copy.isCompleted = original.isCompleted
+        if let url = original.url { copy.url = url }
+        for alarm in original.alarms ?? [] { copy.addAlarm(Self.clone(alarm)) }
+        do {
+            try store.save(copy, commit: true)
+        } catch {
+            throw EventKitError.saveFailed(
+                "could not move reminder into list '\(destination.title)' by recreating it "
+                    + "(\(error.localizedDescription)); the original was left untouched")
+        }
+        do {
+            try store.remove(original, commit: true)
+        } catch {
+            throw EventKitError.removeFailed(
+                "recreated the reminder in '\(destination.title)' (new id \(copy.calendarItemIdentifier)), "
+                    + "but could not delete the original \(originalId): \(error.localizedDescription). "
+                    + "Delete the original manually to avoid a duplicate")
+        }
+        log.info(
+            "reminder moved by recreate",
+            metadata: ["from": .string(originalId), "to": .string(copy.calendarItemIdentifier)])
+        return ReminderResponse(copy)
+    }
+
+    /// Returns a fresh, equivalent copy of an alarm so it can be attached to another reminder
+    /// (the original alarm is bound to its reminder/source). Handles location, absolute-date,
+    /// and relative-offset alarms.
+    private static func clone(_ alarm: EKAlarm) -> EKAlarm {
+        if let location = alarm.structuredLocation {
+            let structured = EKStructuredLocation(title: location.title ?? "")
+            structured.geoLocation = location.geoLocation
+            structured.radius = location.radius
+            let copy = EKAlarm()
+            copy.structuredLocation = structured
+            copy.proximity = alarm.proximity
+            return copy
+        }
+        if let absoluteDate = alarm.absoluteDate {
+            return EKAlarm(absoluteDate: absoluteDate)
+        }
+        return EKAlarm(relativeOffset: alarm.relativeOffset)
     }
 
     public func completeReminders(ids: [String]) async throws -> [ReminderResponse] {

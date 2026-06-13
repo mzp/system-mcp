@@ -25,7 +25,8 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
   - `EventKit/` — EventKit ラッパーの共有部。
     - `EventKitService.swift` — `EKEventStore` を包む **actor** の**共有部分**。権限
       （`requestAccess(to:)` / `ensureAccess(to:label:)` / `authorizationStatus(for:)`）と
-      カレンダー検索（`calendar(idOrName:entity:label:)`）。`store` 等は `package`、
+      カレンダー検索（`calendar(idOrName:entity:label:)`。ID 一致優先、タイトルは 1 件のみ解決し、
+      同名複数は先頭を黙って返さず `ambiguous`（候補 ID 付き）を投げる）。`store` 等は `package`、
       ドメインメソッドは同一モジュール内の `extension` から `public` で生やす。EventKit 型を外に漏らさない。
     - `EventKitError.swift` — `EventKitError`。`accessDenied` の文言は実行バイナリ名（`executableName()`）から生成。
     - `StatusResponse.swift` — 認可状態 DTO（`authorizationStatus`/`requestAccess` の戻り値、単一エンティティ）。
@@ -36,6 +37,10 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
       リスト変更は `updateReminder` ではなく専用の `moveReminder(id:list:)` で行う。場所アラーム付きの
       リマインダーは「移動＋ジオフェンス保持」を 1 回の save でやると EventKit が -3002 で失敗するため、
       アラームを detach → 移動を save → 移動先リストでアラームを付け直して save、の 2 段階で保存する。
+      移動先が read-only なら save 前にエラー。共有リスト等で in-place 移動を EventKit が -3002 で弾いた場合は、
+      `store.reset()` 後に delete+recreate（移動先で新規作成 → 成功後に元を削除、id は変わる）にフォールバックする。
+      `createReminderList(name:force:)` は同名リストが既にあると既定でエラー（重複生成を防ぐ）、
+      `force` 指定時のみ作成（force はユーザーの明示的許可が前提）。詳細は `docs/eventkit.md`。
     - `ReminderResponse.swift` — `ReminderResponse` + EK 変換（場所アラームの
       `location`/`latitude`/`longitude`/`proximity`/`radius` も含む。radius 0 はシステム既定として nil）。
     - `ReminderPriority.swift` — `ReminderPriority`(none/low/medium/high ⇄ 0/1/5/9)。
@@ -120,6 +125,8 @@ printf '%s\n' \
 
 ## 重要な制約・注意
 
+- **EventKit の文書化されていない制約**（場所アラーム付きリマインダーの移動・共有リストへの移動・
+  -3002 の切り分け等）は `docs/eventkit.md` に集約する。該当ロジックを触る前に必ず参照する。
 - **TCC 権限**: EventKit へのアクセスには、(1) Info.plist 埋め込み + (2) コード署名 が必須。
   さらに**対話的なターミナル/アプリから一度起動して許可ダイアログを承認**しないと
   `fullAccess` にならない。ヘッドレス/サンドボックス環境では `notDetermined` のままになり、

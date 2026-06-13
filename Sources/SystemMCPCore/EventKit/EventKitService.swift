@@ -85,14 +85,23 @@ public actor EventKitService {
     // MARK: - Calendar lookup
 
     /// Resolve a calendar/reminder list by identifier or title within an entity type.
+    /// An exact identifier match always wins. For a title, a single match resolves; zero
+    /// matches is `notFound`; multiple same-named lists are `ambiguous` (with candidate ids)
+    /// rather than silently picking one — so callers don't misread it as "doesn't exist".
     package func calendar(idOrName: String, entity: EKEntityType, label: String) throws -> EKCalendar {
         let calendars = store.calendars(for: entity)
         if let byId = calendars.first(where: { $0.calendarIdentifier == idOrName }) {
             return byId
         }
-        if let byName = calendars.first(where: { $0.title == idOrName }) {
-            return byName
+        let byName = calendars.filter { $0.title == idOrName }
+        switch byName.count {
+        case 0:
+            throw EventKitError.notFound("\(label) '\(idOrName)'")
+        case 1:
+            return byName[0]
+        default:
+            throw EventKitError.ambiguous(
+                label: label, name: idOrName, candidateIds: byName.map(\.calendarIdentifier))
         }
-        throw EventKitError.notFound("\(label) '\(idOrName)'")
     }
 }

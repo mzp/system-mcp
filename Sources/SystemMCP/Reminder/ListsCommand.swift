@@ -19,8 +19,10 @@ struct ListsCommand: AsyncParsableCommand {
     struct Create: AsyncParsableCommand {
         static let configuration = CommandConfiguration(abstract: "Create a reminder list.")
         @Argument(help: "New list name.") var name: String
+        @Flag(help: "Create even if a list with the same name already exists (use only with explicit confirmation).")
+        var force: Bool = false
         func run() async throws {
-            Output.json(try await service.createReminderList(name: name))
+            Output.json(try await service.createReminderList(name: name, force: force))
         }
     }
 

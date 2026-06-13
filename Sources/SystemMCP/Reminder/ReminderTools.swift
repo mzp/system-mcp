@@ -56,7 +56,7 @@ enum ReminderMCP {
         Tool(
             name: "move_reminder",
             description:
-                "Move a reminder to another list (name or id). Preserves location triggers and other attributes.",
+                "Move a reminder to another list (name or id). Preserves location triggers and other attributes. Moving into a shared list is done by recreating the reminder there and deleting the original, so the reminder's id changes in that case.",
             inputSchema: object(
                 [
                     "id": string("Reminder id (calendarItemIdentifier)"),
@@ -84,8 +84,15 @@ enum ReminderMCP {
             inputSchema: object([:])),
         Tool(
             name: "create_reminder_list",
-            description: "Create a reminder list.",
-            inputSchema: object(["name": string("New list name")], required: ["name"])),
+            description:
+                "Create a reminder list. Fails if a list with the same name already exists, unless force is true. Do NOT set force on your own to work around a failed lookup: a duplicate name is almost always a mistake. Only pass force after the user has explicitly confirmed they want a second list with that name.",
+            inputSchema: object(
+                [
+                    "name": string("New list name"),
+                    "force": bool(
+                        "Create even if a same-named list exists. Requires the user's explicit confirmation; do not set it to bypass an error."
+                    ),
+                ], required: ["name"])),
         Tool(
             name: "rename_reminder_list",
             description: "Rename a reminder list.",
@@ -150,7 +157,7 @@ enum ReminderMCP {
 
             case "create_reminder_list":
                 guard let name = args.str("name") else { return missing("name") }
-                return jsonResult(try await service.createReminderList(name: name))
+                return jsonResult(try await service.createReminderList(name: name, force: args.bool("force") ?? false))
 
             case "rename_reminder_list":
                 guard let list = args.str("list") else { return missing("list") }

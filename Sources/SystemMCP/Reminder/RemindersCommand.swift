@@ -84,7 +84,9 @@ struct RemindersCommand: AsyncParsableCommand {
 
     struct Move: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Move a reminder to another list (preserves location triggers and other attributes).")
+            abstract:
+                "Move a reminder to another list. Preserves attributes; moving into a shared list recreates it (id changes)."
+        )
 
         @Argument(help: "Reminder id (calendarItemIdentifier).") var id: String
         @Option(help: "Destination list (name or id).") var list: String
