@@ -19,8 +19,8 @@ enum ReminderMCP {
             inputSchema: object([
                 "filter": string("today | tomorrow | week | overdue | upcoming | completed | all (default all)"),
                 "list": string("Reminder list name or id"),
-                "start": string("Range start, ISO8601 or today/tomorrow (overrides filter)"),
-                "end": string("Range end, ISO8601 or today/tomorrow (overrides filter)"),
+                "start": string("Range start, ISO8601, today/tomorrow, or relative (+1h, +30m) (overrides filter)"),
+                "end": string("Range end, ISO8601, today/tomorrow, or relative (+1h, +30m) (overrides filter)"),
             ])),
         Tool(
             name: "add_reminder",
@@ -29,7 +29,8 @@ enum ReminderMCP {
                 [
                     "title": string("Reminder title"),
                     "list": string("Reminder list name or id (default list if omitted)"),
-                    "due": string("Due date, ISO8601 (2026-06-10T10:00) or today/tomorrow"),
+                    "due": string(
+                        "Due date, ISO8601 (2026-06-10T10:00), today/tomorrow, or relative (+1h, +30m, +1h30m)"),
                     "notes": string("Notes"),
                     "priority": string("none | low | medium | high"),
                     "location": string(
@@ -44,7 +45,7 @@ enum ReminderMCP {
                 [
                     "id": string("Reminder id (calendarItemIdentifier)"),
                     "title": string("New title"),
-                    "due": string("New due date, ISO8601 or today/tomorrow"),
+                    "due": string("New due date, ISO8601, today/tomorrow, or relative (+1h, +30m, +1h30m)"),
                     "notes": string("New notes"),
                     "priority": string("none | low | medium | high"),
                     "completed": bool("Mark completed or not"),

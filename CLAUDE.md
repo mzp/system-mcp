@@ -54,7 +54,8 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
       `timeZone` は `EKEvent.timeZone` の識別子）。
     - `CalendarResponse.swift` — カレンダー / リマインダーリスト両用のレスポンス型（`listCalendars` と `listReminderLists` が返す）。
   - ルート直下（ドメイン非依存）:
-    - `DateParsing.swift` — `DateParsing.parse`（ISO8601 / オフセット付き ISO8601 / `today`・`tomorrow`・`yesterday`。
+    - `DateParsing.swift` — `DateParsing.parse`（ISO8601 / オフセット付き ISO8601 / `today`・`tomorrow`・`yesterday` /
+      相対オフセット `+1h`・`+30m`・`+1h30m`・`-2d`（符号必須・now 基準で `Calendar.date(byAdding:)` 解決、`timeZone` 非依存）。
       `timeZone:` でオフセットなし入力の解釈ゾーンを指定可、既定はローカル）、
       `DateParsing.timeZone(from:)`（IANA 名・略称→`TimeZone`）と共有 JSON encoder/decoder。
     - `Geocoder.swift` — `CLGeocoder` による住所/地名→座標の前方ジオコーディング（event の構造化ロケーションと

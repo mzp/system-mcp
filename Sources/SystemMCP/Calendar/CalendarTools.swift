@@ -23,8 +23,8 @@ enum CalendarMCP {
             description: "List calendar events within a date range.",
             inputSchema: object(
                 [
-                    "start": string("Range start, ISO8601 or today/tomorrow"),
-                    "end": string("Range end, ISO8601 or today/tomorrow"),
+                    "start": string("Range start, ISO8601, today/tomorrow, or relative (+1h, +30m)"),
+                    "end": string("Range end, ISO8601, today/tomorrow, or relative (+1h, +30m)"),
                     "calendar": string("Restrict to a calendar (name or id)"),
                     "timezone": string(
                         "Time zone for interpreting start/end (IANA name like America/New_York, or EST; local time if omitted)"
@@ -37,8 +37,8 @@ enum CalendarMCP {
                 [
                     "title": string("Event title"),
                     "calendar": string("Calendar name or id (default calendar if omitted)"),
-                    "start": string("Start, ISO8601 (2026-06-10T10:00) or today/tomorrow"),
-                    "end": string("End, ISO8601 or today/tomorrow"),
+                    "start": string("Start, ISO8601 (2026-06-10T10:00), today/tomorrow, or relative (+1h, +30m)"),
+                    "end": string("End, ISO8601, today/tomorrow, or relative (+1h, +30m)"),
                     "timezone": string(
                         "Time zone of the event (IANA name like America/New_York, or EST). "
                             + "Start/end without an explicit offset are interpreted in this zone; local time if omitted"
@@ -56,8 +56,8 @@ enum CalendarMCP {
                     "id": string("Event id (eventIdentifier)"),
                     "title": string("New title"),
                     "calendar": string("Move to calendar (name or id)"),
-                    "start": string("New start, ISO8601 or today/tomorrow"),
-                    "end": string("New end, ISO8601 or today/tomorrow"),
+                    "start": string("New start, ISO8601, today/tomorrow, or relative (+1h, +30m)"),
+                    "end": string("New end, ISO8601, today/tomorrow, or relative (+1h, +30m)"),
                     "timezone": string(
                         "New time zone of the event (IANA name like America/New_York, or EST). "
                             + "Start/end without an explicit offset are interpreted in this zone"),

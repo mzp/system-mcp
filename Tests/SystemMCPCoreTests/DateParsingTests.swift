@@ -62,6 +62,28 @@ import Testing
         #expect(DateParsing.parse("TOMORROW") != nil)
     }
 
+    @Test func parsesRelativeOffsetFromInjectedNow() throws {
+        let now = try #require(DateParsing.parse("2026-06-10T10:00"))
+
+        #expect(DateParsing.parseRelative("+1h", now: now) == calendar.date(byAdding: .hour, value: 1, to: now))
+        #expect(DateParsing.parseRelative("+30m", now: now) == calendar.date(byAdding: .minute, value: 30, to: now))
+        #expect(DateParsing.parseRelative("+2d", now: now) == calendar.date(byAdding: .day, value: 2, to: now))
+        #expect(DateParsing.parseRelative("+1w", now: now) == calendar.date(byAdding: .day, value: 7, to: now))
+        #expect(DateParsing.parseRelative("-15m", now: now) == calendar.date(byAdding: .minute, value: -15, to: now))
+    }
+
+    @Test func combinesRelativeOffsetSegments() throws {
+        let now = try #require(DateParsing.parse("2026-06-10T10:00"))
+        let expected = calendar.date(byAdding: .minute, value: 90, to: now)  // 1h30m
+        #expect(DateParsing.parseRelative("+1h30m", now: now) == expected)
+    }
+
+    @Test func parseResolvesRelativeOffsetFromCurrentTime() throws {
+        let parsed = try #require(DateParsing.parse("+1h"))
+        // now-based, so it lands roughly an hour ahead; allow slack for clock drift during the test.
+        #expect(abs(parsed.timeIntervalSinceNow - 3600) < 5)
+    }
+
     @Test func trimsWhitespace() throws {
         let date = try #require(DateParsing.parse("  2026-06-10  "))
         #expect(components(date).day == 10)
@@ -70,6 +92,7 @@ import Testing
     @Test(arguments: [
         "", "   ", "not a date", "2026/06/10", "10:30", "2026-13-45",
         "2026-06-10T10:00+9:00", "2026-06-10+09:00",
+        "1h", "+1x", "+h", "+", "+1", "++1h", "+1.5h", "1h30m",
     ])
     func rejectsInvalidInput(_ input: String) {
         #expect(DateParsing.parse(input) == nil)

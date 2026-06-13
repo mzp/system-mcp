@@ -19,10 +19,10 @@ struct RemindersCommand: AsyncParsableCommand {
         @Option(help: "Restrict to a reminder list (name or id).")
         var list: String?
 
-        @Option(help: "Range start (ISO8601 or today/tomorrow). Overrides --filter.")
+        @Option(help: "Range start (ISO8601, today/tomorrow, or relative like +1h). Overrides --filter.")
         var start: String?
 
-        @Option(help: "Range end (ISO8601 or today/tomorrow). Overrides --filter.")
+        @Option(help: "Range end (ISO8601, today/tomorrow, or relative like +1h). Overrides --filter.")
         var end: String?
 
         func run() async throws {
@@ -37,7 +37,7 @@ struct RemindersCommand: AsyncParsableCommand {
 
         @Option(help: "Reminder title.") var title: String
         @Option(help: "Reminder list (name or id).") var list: String?
-        @Option(help: "Due date (ISO8601 or today/tomorrow).") var due: String?
+        @Option(help: "Due date (ISO8601, today/tomorrow, or relative like +1h/+30m/+1h30m).") var due: String?
         @Option(help: "Notes.") var notes: String?
         @Option(help: "Priority: none/low/medium/high.") var priority: String?
         @Option(help: "Location trigger (address or place name; must geocode to coordinates).")
@@ -61,7 +61,7 @@ struct RemindersCommand: AsyncParsableCommand {
 
         @Argument(help: "Reminder id (calendarItemIdentifier).") var id: String
         @Option(help: "New title.") var title: String?
-        @Option(help: "New due date (ISO8601 or today/tomorrow).") var due: String?
+        @Option(help: "New due date (ISO8601, today/tomorrow, or relative like +1h/+30m/+1h30m).") var due: String?
         @Option(help: "New notes.") var notes: String?
         @Option(help: "Priority: none/low/medium/high.") var priority: String?
         @Flag(inversion: .prefixedNo, help: "Mark completed / not completed.") var completed: Bool?

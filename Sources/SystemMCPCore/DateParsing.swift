@@ -7,8 +7,11 @@ import Foundation
 ///   - ISO8601 with offset:    `2026-06-10T10:00:00-05:00`, `2026-06-10T10:00Z` (offset wins over `timeZone`)
 ///   - Date only:              `2026-06-10` (resolves to start of day)
 ///   - Relative keywords:      `today`, `tomorrow`, `yesterday` (start of day)
+///   - Relative offset:        `+1h`, `+30m`, `+1h30m`, `-2d` (sign required; resolved from now)
 ///
 /// Inputs without an explicit offset are interpreted in `timeZone` (local time by default).
+/// Relative offsets are resolved from the current time and ignore `timeZone` (they measure
+/// elapsed wall-clock time).
 public enum DateParsing {
     public static func parse(_ string: String, timeZone: TimeZone = .current) -> Date? {
         let trimmed = string.trimmingCharacters(in: .whitespaces)
@@ -25,6 +28,10 @@ public enum DateParsing {
             return calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: Date()))
         default:
             break
+        }
+
+        if let date = parseRelative(trimmed, now: Date()) {
+            return date
         }
 
         if let date = parseWithOffset(trimmed) {
@@ -93,6 +100,31 @@ public enum DateParsing {
             }
         }
         return nil
+    }
+
+    /// Parses a sign-prefixed relative offset (`+1h`, `+30m`, `+1h30m`, `-2d`) and adds it to
+    /// `now`. The sign is required so bare `1h` stays invalid and never collides with the
+    /// ISO8601 / date-only / keyword forms. Units: `w` (weeks), `d` (days), `h` (hours),
+    /// `m` (minutes). `now` is injected to keep the math testable.
+    static func parseRelative(_ string: String, now: Date) -> Date? {
+        // Regex isn't Sendable, so build it locally instead of caching it statically.
+        let shape = /^([+-])((?:\d+[wdhm])+)$/
+        guard let match = string.wholeMatch(of: shape) else { return nil }
+        let sign = match.1 == "-" ? -1 : 1
+
+        var components = DateComponents()
+        for segment in match.2.matches(of: /(\d+)([wdhm])/) {
+            guard let value = Int(segment.1) else { return nil }
+            let signed = value * sign
+            switch segment.2 {
+            case "w": components.weekOfYear = (components.weekOfYear ?? 0) + signed
+            case "d": components.day = (components.day ?? 0) + signed
+            case "h": components.hour = (components.hour ?? 0) + signed
+            case "m": components.minute = (components.minute ?? 0) + signed
+            default: return nil
+            }
+        }
+        return Calendar.current.date(byAdding: components, to: now)
     }
 
     private static let naivePatterns = [

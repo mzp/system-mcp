@@ -12,8 +12,8 @@ struct EventsCommand: AsyncParsableCommand {
     struct List: AsyncParsableCommand {
         static let configuration = CommandConfiguration(abstract: "List events in a date range.")
 
-        @Option(help: "Range start (ISO8601 or today/tomorrow).") var start: String
-        @Option(help: "Range end (ISO8601 or today/tomorrow).") var end: String
+        @Option(help: "Range start (ISO8601, today/tomorrow, or relative like +1h).") var start: String
+        @Option(help: "Range end (ISO8601, today/tomorrow, or relative like +1h).") var end: String
         @Option(help: "Restrict to a calendar (name or id).") var calendar: String?
         @Option(help: "Time zone for interpreting start/end (IANA name like America/New_York, or EST).")
         var timezone: String?
@@ -33,8 +33,8 @@ struct EventsCommand: AsyncParsableCommand {
 
         @Option(help: "Event title.") var title: String
         @Option(help: "Calendar (name or id).") var calendar: String?
-        @Option(help: "Start (ISO8601 or today/tomorrow).") var start: String
-        @Option(help: "End (ISO8601 or today/tomorrow).") var end: String
+        @Option(help: "Start (ISO8601, today/tomorrow, or relative like +1h).") var start: String
+        @Option(help: "End (ISO8601, today/tomorrow, or relative like +1h).") var end: String
         @Flag(help: "All-day event.") var allDay: Bool = false
         @Option(help: "Notes.") var notes: String?
         @Option(help: "Location (address or place name; geocoded to map coordinates when resolvable).")
@@ -64,8 +64,8 @@ struct EventsCommand: AsyncParsableCommand {
         @Argument(help: "Event id (eventIdentifier).") var id: String
         @Option(help: "New title.") var title: String?
         @Option(help: "Move to calendar (name or id).") var calendar: String?
-        @Option(help: "New start (ISO8601 or today/tomorrow).") var start: String?
-        @Option(help: "New end (ISO8601 or today/tomorrow).") var end: String?
+        @Option(help: "New start (ISO8601, today/tomorrow, or relative like +1h).") var start: String?
+        @Option(help: "New end (ISO8601, today/tomorrow, or relative like +1h).") var end: String?
         @Flag(inversion: .prefixedNo, help: "All-day event.") var allDay: Bool?
         @Option(help: "New notes.") var notes: String?
         @Option(help: "New location (address or place name; geocoded to map coordinates when resolvable).")
