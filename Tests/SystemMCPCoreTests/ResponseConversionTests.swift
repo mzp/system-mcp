@@ -37,8 +37,21 @@ import Testing
         #expect(response.priority == "high")
         #expect(response.url == "https://example.com/x")
         #expect(response.dueDate == due.date)
+        #expect(response.timeZone == nil)  // floating: no zone on the due components
         #expect(response.location == nil)  // no location alarm
         #expect(response.proximity == nil)
+    }
+
+    @Test func surfacesFixedDueDateTimeZone() {
+        let store = EKEventStore()
+        let reminder = EKReminder(eventStore: store)
+        reminder.title = "standup"
+        var due = DateComponents(year: 2026, month: 6, day: 10, hour: 9, minute: 0)
+        due.timeZone = TimeZone(identifier: "America/New_York")
+        reminder.dueDateComponents = due
+
+        let response = ReminderResponse(reminder)
+        #expect(response.timeZone == "America/New_York")
     }
 
     @Test func convertsLocationAlarm() {

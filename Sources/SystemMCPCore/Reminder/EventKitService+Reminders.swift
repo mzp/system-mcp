@@ -162,7 +162,7 @@ extension EventKitService {
     public func addReminder(
         title: String, list: String? = nil, due: Date? = nil, notes: String? = nil,
         priority: String? = nil, location: String? = nil, proximity: String? = nil,
-        radius: Double? = nil
+        radius: Double? = nil, timeZone: TimeZone? = nil
     ) async throws -> ReminderResponse {
         log.debug(
             "addReminder",
@@ -170,6 +170,7 @@ extension EventKitService {
                 "title": .string(title), "list": .string(list ?? "<default>"),
                 "due": "\(due as Any)", "priority": .string(priority ?? "none"),
                 "location": .string(location ?? "<none>"),
+                "timeZone": .string(timeZone?.identifier ?? "<floating>"),
             ])
         try await ensureRemindersAccess()
         let reminder = EKReminder(eventStore: store)
@@ -181,7 +182,7 @@ extension EventKitService {
             throw EventKitError.saveFailed("no default reminder list available; specify --list")
         }
         if let notes { reminder.notes = notes }
-        if let due { reminder.dueDateComponents = DateParsing.dueComponents(from: due) }
+        if let due { reminder.dueDateComponents = DateParsing.dueComponents(from: due, timeZone: timeZone) }
         if let priority { reminder.priority = try Self.priorityValue(priority) }
         try await setLocationAlarm(on: reminder, location: location, proximity: proximity, radius: radius)
         try save(reminder)
@@ -192,7 +193,8 @@ extension EventKitService {
     public func updateReminder(
         id: String, title: String? = nil, due: Date? = nil,
         notes: String? = nil, priority: String? = nil, completed: Bool? = nil,
-        location: String? = nil, proximity: String? = nil, radius: Double? = nil
+        location: String? = nil, proximity: String? = nil, radius: Double? = nil,
+        timeZone: TimeZone? = nil
     ) async throws -> ReminderResponse {
         log.debug(
             "updateReminder",
@@ -206,7 +208,7 @@ extension EventKitService {
             throw EventKitError.notFound("reminder \(id)")
         }
         if let title { reminder.title = title }
-        if let due { reminder.dueDateComponents = DateParsing.dueComponents(from: due) }
+        if let due { reminder.dueDateComponents = DateParsing.dueComponents(from: due, timeZone: timeZone) }
         if let notes { reminder.notes = notes }
         if let priority { reminder.priority = try Self.priorityValue(priority) }
         if let completed { reminder.isCompleted = completed }

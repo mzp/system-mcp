@@ -109,6 +109,26 @@ import Testing
         #expect(due.second == nil)
     }
 
+    @Test func dueComponentsAreFloatingWithoutTimeZone() throws {
+        let date = try #require(DateParsing.parse("2026-06-10T10:30"))
+        let due = DateParsing.dueComponents(from: date)
+        #expect(due.timeZone == nil)
+    }
+
+    @Test func dueComponentsAnchorToGivenTimeZone() throws {
+        let tokyo = try #require(TimeZone(identifier: "Asia/Tokyo"))
+        // 10:30 wall-clock in Tokyo.
+        let date = try #require(DateParsing.parse("2026-06-10T10:30", timeZone: tokyo))
+        let due = DateParsing.dueComponents(from: date, timeZone: tokyo)
+        #expect(due.timeZone == tokyo)
+        // Components are extracted in the anchored zone, so they read back as the same wall-clock.
+        #expect(due.year == 2026)
+        #expect(due.month == 6)
+        #expect(due.day == 10)
+        #expect(due.hour == 10)
+        #expect(due.minute == 30)
+    }
+
     @Test func jsonEncoderUsesISO8601AndSortedKeys() throws {
         struct Sample: Codable {
             let b: Date

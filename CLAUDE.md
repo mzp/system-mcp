@@ -32,6 +32,7 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
     - `StatusResponse.swift` — 認可状態 DTO（`authorizationStatus`/`requestAccess` の戻り値、単一エンティティ）。
   - `Reminder/` — reminder ドメイン。
     - `EventKitService+Reminders.swift` — `extension EventKitService` に reminder/list の CRUD（`public`）と `ReminderFilter`。
+      `timeZone` 指定時は期日を絶対時刻に固定（`dueDateComponents.timeZone` セット）、未指定なら floating（既定）。詳細は `docs/eventkit.md`。
       `location`/`proximity`/`radius` で場所トリガー付き `EKAlarm` をセット（座標解決できない location はエラー。
       update 時は既存の場所アラームを置き換え、時刻ベースのアラームは保持）。
       リスト変更は `updateReminder` ではなく専用の `moveReminder(id:list:)` で行う。場所アラーム付きの
@@ -42,7 +43,8 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
       `createReminderList(name:force:)` は同名リストが既にあると既定でエラー（重複生成を防ぐ）、
       `force` 指定時のみ作成（force はユーザーの明示的許可が前提）。詳細は `docs/eventkit.md`。
     - `ReminderResponse.swift` — `ReminderResponse` + EK 変換（場所アラームの
-      `location`/`latitude`/`longitude`/`proximity`/`radius` も含む。radius 0 はシステム既定として nil）。
+      `location`/`latitude`/`longitude`/`proximity`/`radius` も含む。radius 0 はシステム既定として nil。
+      `timeZone` は固定された期日のゾーン識別子。floating（タイムゾーン無し）なら nil）。
     - `ReminderPriority.swift` — `ReminderPriority`(none/low/medium/high ⇄ 0/1/5/9)。
     - `AlarmProximity.swift` — `AlarmProximity`(enter/leave ⇄ `EKAlarmProximity`)。
   - `Calendar/` — event ドメイン。

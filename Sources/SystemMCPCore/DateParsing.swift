@@ -66,10 +66,19 @@ public enum DateParsing {
         return nil
     }
 
-    /// Date components (down to the minute, local calendar) used to set a reminder's due date.
-    public static func dueComponents(from date: Date) -> DateComponents {
-        Calendar.current.dateComponents(
-            [.year, .month, .day, .hour, .minute], from: date)
+    /// Date components (down to the minute) used to set a reminder's due date.
+    ///
+    /// With `timeZone == nil` the reminder is *floating*: the components carry no zone, so the
+    /// reminder fires at that wall-clock time in whatever zone the device is in (the Reminders
+    /// app's default). With a `timeZone` the components are extracted in—and anchored to—that
+    /// zone, fixing the reminder to an absolute moment so its order stays stable against
+    /// time-zoned calendar events. See docs/eventkit.md.
+    public static func dueComponents(from date: Date, timeZone: TimeZone? = nil) -> DateComponents {
+        var calendar = Calendar.current
+        if let timeZone { calendar.timeZone = timeZone }
+        var components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        components.timeZone = timeZone
+        return components
     }
 
     /// JSON encoder/decoder with ISO8601 dates, shared so CLI and MCP emit identical output.

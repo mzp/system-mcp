@@ -46,12 +46,20 @@ struct RemindersCommand: AsyncParsableCommand {
         var proximity: String?
         @Option(help: "Location trigger radius in meters (system default if omitted).")
         var radius: Double?
+        @Option(
+            help: """
+                Time zone for the due date (IANA name like America/New_York, or EST). \
+                Without it the reminder floats (fires at this wall-clock time in the local zone); \
+                with it the due date is fixed to that zone's absolute moment.
+                """)
+        var timezone: String?
 
         func run() async throws {
-            let dueDate = try due.map { try parseDateOrThrow($0, field: "due") }
+            let zone = try timezone.map(parseTimeZoneOrThrow)
+            let dueDate = try due.map { try parseDateOrThrow($0, field: "due", timeZone: zone ?? .current) }
             let reminder = try await service.addReminder(
                 title: title, list: list, due: dueDate, notes: notes, priority: priority,
-                location: location, proximity: proximity, radius: radius)
+                location: location, proximity: proximity, radius: radius, timeZone: zone)
             Output.json(reminder)
         }
     }
@@ -71,13 +79,21 @@ struct RemindersCommand: AsyncParsableCommand {
         var proximity: String?
         @Option(help: "Location trigger radius in meters (system default if omitted).")
         var radius: Double?
+        @Option(
+            help: """
+                Time zone for the due date (IANA name like America/New_York, or EST). \
+                Without it the reminder floats (fires at this wall-clock time in the local zone); \
+                with it the due date is fixed to that zone's absolute moment.
+                """)
+        var timezone: String?
 
         func run() async throws {
-            let dueDate = try due.map { try parseDateOrThrow($0, field: "due") }
+            let zone = try timezone.map(parseTimeZoneOrThrow)
+            let dueDate = try due.map { try parseDateOrThrow($0, field: "due", timeZone: zone ?? .current) }
             let reminder = try await service.updateReminder(
                 id: id, title: title, due: dueDate, notes: notes,
                 priority: priority, completed: completed,
-                location: location, proximity: proximity, radius: radius)
+                location: location, proximity: proximity, radius: radius, timeZone: zone)
             Output.json(reminder)
         }
     }

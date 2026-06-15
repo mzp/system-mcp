@@ -59,6 +59,30 @@ EventKit / reminderkit を触っていて踏んだ、公式ドキュメントに
 recreate で複写するのは title / notes / priority / due / start / completed / url / alarms。
 繰り返しルール等スコープ外のフィールドは複写されない点に注意。
 
+## 3. リマインダーの期日は既定で floating（タイムゾーン無し）。イベントは絶対時刻
+
+**背景**: EventKit ではイベント (`EKEvent`) とリマインダー (`EKReminder`) で時刻の持ち方が違う。
+
+- **イベント**: `startDate`/`endDate` は絶対時刻（`Date`）+ `timeZone`。常にタイムゾーン付きの
+  一点を指す。カレンダーアプリで表示ゾーンを切り替えると、壁掛け時計の表示は動くが**順序は不変**。
+- **リマインダー**: 期日は `dueDateComponents`（`DateComponents`）で持つ。`DateComponents.timeZone`
+  が **nil なら floating**（タイムゾーン非依存の壁掛け時計時刻。デバイスの現在ゾーンでその時刻に発火）、
+  **セットすれば fixed**（そのゾーンの絶対時刻に固定）。
+
+**問題**: floating なリマインダーと絶対時刻のイベントを同じタイムライン上で並べると、
+表示ゾーンを切り替えたときに**両者の前後関係がずれる**（floating 側だけ壁掛け時計に追従して動くため）。
+MCP/LLM 経由だとこの差を取り違えやすい。
+
+**対処**: リマインダーにもタイムゾーンを**指定できる**ようにした（add/update の `--timezone` / `timezone`）。
+
+- 指定なし: 従来どおり floating（`dueDateComponents.timeZone == nil`）。Reminders アプリの既定挙動。
+- 指定あり: 入力日時をそのゾーンで解釈し、`dueDateComponents` をそのゾーンで抽出して
+  `dueDateComponents.timeZone` にセット → イベントと同じく絶対時刻に固定でき、順序が安定する。
+
+実装は `DateParsing.dueComponents(from:timeZone:)` の 1 箇所に集約（イベントの `EKEvent.timeZone` と対になる）。
+`ReminderResponse.timeZone` で現在の固定ゾーン（floating なら nil）を返す。
+相対オフセット（`+1h` 等）は now 基準で解決されゾーン非依存なので、`timezone` 併用時はその絶対時刻が固定される。
+
 ## 補足: 同名リストの曖昧さ
 
 -3002 とは別問題だが関連して踏んだもの。リストを名前で解決する際、同名リストが複数あると

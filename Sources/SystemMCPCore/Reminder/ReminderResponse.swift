@@ -12,6 +12,9 @@ public struct ReminderResponse: Codable, Sendable {
     public let completed: Bool
     public let completionDate: Date?
     public let dueDate: Date?
+    /// Time zone the due date is anchored to (IANA identifier), or nil when the reminder is
+    /// floating (no zone — fires at the local wall-clock time). See docs/eventkit.md.
+    public let timeZone: String?
     public let priority: String
     public let location: String?
     public let latitude: Double?
@@ -33,6 +36,7 @@ extension ReminderResponse {
         self.completed = reminder.isCompleted
         self.completionDate = reminder.completionDate
         self.dueDate = reminder.dueDateComponents?.date
+        self.timeZone = reminder.dueDateComponents?.timeZone?.identifier
         self.priority = ReminderPriority(ekValue: reminder.priority).rawValue
         let locationAlarm = reminder.alarms?.first { $0.structuredLocation != nil }
         self.location = locationAlarm?.structuredLocation?.title
