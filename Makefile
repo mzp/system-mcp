@@ -3,6 +3,11 @@ RELEASE_BIN := .build/release/$(BINARY)
 # Override with a Developer ID identity for a persistent TCC grant, e.g.
 #   make sign SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
 SIGN_IDENTITY ?= -
+# Stable install location on $PATH. Re-builds overwrite .build/release, so we copy
+# the signed binary here for day-to-day use (hermes, Claude Desktop, shell).
+# Override with: make install INSTALL_DIR=/somewhere/else
+INSTALL_DIR ?= $(HOME)/.local/bin
+INSTALLED_BIN := $(INSTALL_DIR)/$(BINARY)
 
 .PHONY: build release test format lint sign install clean run-reminder-serve run-calendar-serve
 
@@ -28,10 +33,20 @@ sign: release
 	@echo "Signed $(RELEASE_BIN)"
 	@codesign -dvv "$(RELEASE_BIN)" 2>&1 | grep -E "Identifier|Authority|Signature" || true
 
-# Build, sign, and print the absolute path to use in claude_desktop_config.json.
+# Build, sign, and copy the binary to a stable $PATH location ($(INSTALL_DIR)).
+# A plain byte copy preserves the embedded signature and cdhash, so the existing
+# TCC grant for jp.mzp.systemmcp keeps working without re-approval.
 install: sign
-	@echo "Binary ready at: $(abspath $(RELEASE_BIN))"
-	@echo "Grant permissions once: $(abspath $(RELEASE_BIN)) reminder status && $(abspath $(RELEASE_BIN)) calendar status"
+	@mkdir -p "$(INSTALL_DIR)"
+	@# Atomic replace via temp + mv. Overwriting a signed Mach-O in place (cp -f over
+	@# the same inode) makes the kernel kill it with "Killed: 9" on next exec, because
+	@# the cached page hashes no longer match. A new inode + rename avoids that.
+	@cp -f "$(RELEASE_BIN)" "$(INSTALLED_BIN).tmp"
+	@mv -f "$(INSTALLED_BIN).tmp" "$(INSTALLED_BIN)"
+	@echo "Installed: $(INSTALLED_BIN)"
+	@codesign --verify --verbose=1 "$(INSTALLED_BIN)" 2>&1 | tail -1 || true
+	@echo "Grant permissions once from a GUI terminal/app (so the prompt appears):"
+	@echo "  $(INSTALLED_BIN) reminder status && $(INSTALLED_BIN) calendar status"
 
 clean:
 	swift package clean
