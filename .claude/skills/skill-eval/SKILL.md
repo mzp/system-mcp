@@ -16,7 +16,7 @@ From the repo root:
 
 ```sh
 skills/eval/run.sh             # all cases
-skills/eval/run.sh kitchen     # one case: today | shop_list | cal_tomorrow | kitchen
+skills/eval/run.sh kitchen     # one case: today | shop_list | cal_tomorrow | kitchen | tz_floating
 MODEL=qwen/qwen3.7-plus skills/eval/run.sh    # test a different model (e.g. the live default)
 ```
 
@@ -43,7 +43,8 @@ summary line and any FAILs to the user; on failure, show the case and what was e
 | `today` | 今日のリマインダー見せて | emits `reminders list --filter today` |
 | `shop_list` | 買い物リストに何が入ってる？ | emits a `reminders list` scoped to 買い物 |
 | `cal_tomorrow` | 明日の予定を教えて | emits `events list` over a `T00:00:00`→`T00:00:00` day range |
-| `kitchen` | キッチンペーパーを買い物リストに追加して | emits a correct `reminders add … --list 買い物` and a キッチンペーパー reminder really appears (then is cleaned up) |
+| `kitchen` | [テスト用]キッチンペーパーを買い物リストに追加して | emits a correct `reminders add … --list 買い物` and a [テスト用]キッチンペーパー reminder really appears (then is cleaned up) |
+| `tz_floating` | どこにいても現地時間の朝9時に鳴るようリマインド | emits `reminders add … --timezone floating` and the created reminder really has `floating: true` (then is cleaned up) |
 
 ## Requirements / gotchas
 

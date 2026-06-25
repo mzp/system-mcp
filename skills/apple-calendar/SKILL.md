@@ -30,6 +30,18 @@ A date/time argument must be **exactly one of these forms**, or it is rejected w
 
 **Never pass words like `next week`, `来週`, `週末`, `朝`.** Convert first.
 
+## Time zone (`--timezone`, on list / add / update)
+
+Controls the event's zone and how offset-less `--start`/`--end` are interpreted:
+
+| `--timezone` value | Meaning | Use when |
+|---|---|---|
+| *(omitted — default)* | **Local** — interpret/keep times in the device's zone. (On add, the event gets the local zone; on update, the existing zone is left as-is.) | Normal case. Leave it off. |
+| `floating` (or `none`) | **No zone** — the wall-clock time is the same wherever you are. | An all-day or time-of-day event that must not shift across time zones. |
+| an IANA name / abbreviation, e.g. `Asia/Tokyo`, `America/New_York`, `EST` | **Fixed** to that zone; offset-less `--start`/`--end` are read in that zone. | A meeting in another city ("10am Tokyo time"), or listing another zone's day. |
+
+In a result, `floating: true` and an offset-less `startDate` means floating; otherwise `startDate` carries the zone's offset (e.g. `2026-06-26T10:00:00+09:00`) and `timeZone` names the zone.
+
 ## List events (start AND end are required)
 
 ```
@@ -58,6 +70,7 @@ Rule of thumb: for a single specific day, set `--start` to that day at `T00:00:0
 - `--all-day` for a full-day event (still pass `--start`/`--end` as the day(s)).
 - Omit `--calendar` to use the system default calendar. Only pass `--calendar` if the user names one; confirm it is writable first via `calendars list` (`allowsModifications: true`).
 - `--location` is geocoded to a map pin when resolvable; otherwise it's kept as text.
+- `--timezone` controls the event's zone — see **Time zone** above (default = local; `floating` = travel-proof; a zone name = fixed to that place).
 
 Example — "dentist tomorrow 10–11am" (today = 2026-06-25):
 ```

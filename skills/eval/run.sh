@@ -76,34 +76,34 @@ case_cal_tomorrow() {
 # A duplicate-titled item already exists in 買い物, so we diff ids before/after to find
 # exactly what the agent added, verify it, and delete only that.
 case_kitchen() {
-  echo "[kitchen] キッチンペーパーを買い物リストに追加して"
+  local item="[テスト用]キッチンペーパー"
+  echo "[kitchen] ${item}を買い物リストに追加して"
   local before after added t
   before="$(shop_ids | sort)"
-  t="$(ask 'apple-reminderスキルで、キッチンペーパーを買い物リストに追加して')"
+  t="$(ask "apple-reminderスキルで、${item}を買い物リストに追加して")"
   after="$(shop_ids | sort)"
   added="$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after"))"
 
   # 1. emitted the right command
-  if have "$t" "reminders add" && have "$t" "キッチンペーパー" && have "$t" "$SHOP"; then
-    ok "emitted: reminders add --title キッチンペーパー --list 買い物"
+  if have "$t" "reminders add" && have "$t" "$item" && have "$t" "$SHOP"; then
+    ok "emitted: reminders add --title $item --list 買い物"
   else
     bad "did not emit a correct 'reminders add' for 買い物"
   fi
 
-  # 2. real effect: a new キッチンペーパー reminder appeared in 買い物.
-  # (A duplicate of the same title may already exist; we only judge what was added.
-  # A weak model occasionally fires `add` twice — that still counts as "can add".)
+  # 2. real effect: a new [テスト用]キッチンペーパー reminder appeared in 買い物.
+  # (A weak model occasionally fires `add` twice — that still counts as "can add".)
   local n match title; n="$(printf '%s' "$added" | grep -c .)"; match=0
   while read -r id; do
     [ -z "$id" ] && continue
     title="$(sysmcp reminder reminders list --filter all --list "$SHOP" \
       | python3 -c 'import sys,json;d=json.load(sys.stdin);i=sys.argv[1];print(next((r["title"] for r in d if r["id"]==i),""))' "$id" 2>/dev/null)"
-    [ "$title" = "キッチンペーパー" ] && match=$((match+1))
+    [ "$title" = "$item" ] && match=$((match+1))
   done <<<"$added"
   if [ "$match" -ge 1 ]; then
-    ok "added $match キッチンペーパー reminder(s) to 買い物 (of $n new)"
+    ok "added $match $item reminder(s) to 買い物 (of $n new)"
   else
-    bad "no new キッチンペーパー reminder appeared (n=$n)"
+    bad "no new $item reminder appeared (n=$n)"
   fi
 
   # 3. cleanup: delete only what we added
@@ -113,12 +113,41 @@ case_kitchen() {
   fi
 }
 
+# ── Time-zone case (self-cleaning): a travel-proof reminder → --timezone floating ───
+# "fire at 9am wherever I am" is the floating anchor. Checks both the emitted flag and
+# that the created reminder really has floating:true, then deletes it by unique title.
+case_tz_floating() {
+  echo "[tz_floating] どこでも現地9時に鳴る → --timezone floating"
+  local title="__tztest_floating__" t found ids
+  t="$(ask "apple-reminderスキルで、明日の朝9時に『${title}』を、旅行中でもどこにいても現地時間の朝9時に鳴るようにリマインドして")"
+
+  if have "$t" "reminders add" && { have "$t" "--timezone floating" || have "$t" "--timezone none"; }; then
+    ok "emitted: reminders add … --timezone floating"
+  else
+    bad "did not pass --timezone floating/none"
+  fi
+
+  found="$(sysmcp reminder reminders list --filter all \
+    | python3 -c 'import sys,json;d=json.load(sys.stdin);t=sys.argv[1];print(sum(1 for r in d if r.get("title")==t and r.get("floating") is True))' "$title" 2>/dev/null)"
+  if [ "${found:-0}" -ge 1 ]; then
+    ok "created a floating reminder (floating=true)"
+  else
+    bad "no floating reminder named $title found"
+  fi
+
+  ids="$(sysmcp reminder reminders list --filter all \
+    | python3 -c 'import sys,json;d=json.load(sys.stdin);t=sys.argv[1];print("\n".join(r["id"] for r in d if r.get("title")==t))' "$title" 2>/dev/null)"
+  while read -r id; do [ -n "$id" ] && sysmcp reminder reminders delete "$id" >/dev/null; done <<<"$ids"
+  [ -n "$ids" ] && echo "  cleanup: deleted floating test reminder(s)"
+}
+
 run() {
   case "$1" in
     today)        case_today ;;
     shop_list)    case_shop_list ;;
     cal_tomorrow) case_cal_tomorrow ;;
     kitchen)      case_kitchen ;;
+    tz_floating)  case_tz_floating ;;
     *) echo "unknown case: $1" >&2; exit 2 ;;
   esac
 }
@@ -128,7 +157,7 @@ echo
 if [ $# -ge 1 ]; then
   run "$1"
 else
-  for c in today shop_list cal_tomorrow kitchen; do run "$c"; echo; done
+  for c in today shop_list cal_tomorrow kitchen tz_floating; do run "$c"; echo; done
 fi
 echo
 echo "── result: $PASS passed, $FAIL failed ──"

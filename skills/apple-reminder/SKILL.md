@@ -30,6 +30,18 @@ A date/time argument must be **exactly one of these forms**. Anything else is re
 
 **Never pass words like `next week`, `来week`, `来週`, `morning`, `朝`, `週末`.** Convert first. For "tomorrow 9am", compute the ISO datetime from today's date in context. For listing, prefer the filter presets below so you don't have to compute dates at all.
 
+## Time zone (`--timezone`, on add / update)
+
+Controls how a due time is anchored. Three choices:
+
+| `--timezone` value | Meaning | Use when |
+|---|---|---|
+| *(omitted — default)* | Anchored to the device's **local zone** — a concrete moment. | Normal case. Just leave it off. |
+| `floating` (or `none`) | **No zone** — fires at that wall-clock time wherever the device is. | "9am, wherever I am" — daily/travel reminders that must not shift across time zones. |
+| an IANA name / abbreviation, e.g. `America/New_York`, `EST`, `Asia/Tokyo` | **Fixed** to that zone's absolute moment; an offset-less `--due` is also read in that zone. | "10am New York time" — a time tied to a specific place. |
+
+Only pass `--timezone floating` or a named zone when the user's intent clearly calls for it; otherwise omit it (local). In the result, `floating: true` and a `dueDate` without an offset means floating; `floating: false` with a `dueDate` offset (e.g. `2026-06-26T09:00:00-07:00`) and a `timeZone` field means anchored.
+
 ## Quoting
 
 Always wrap titles, notes, and list names in double quotes — they usually contain spaces or Japanese: `--title "牛乳を買う"`, `--list "買い物"`.
@@ -70,7 +82,7 @@ The `id` is what every other operation needs.
 
 Optional location trigger (only if the user asks for an arrive/leave reminder at a place):
 `--location "<address or place>" [--proximity enter|leave] [--radius <meters>]` (default proximity `enter`; the place must geocode or it errors).
-Optional `--timezone <IANA name, e.g. America/New_York>` pins the due time to that zone; omit it for a floating local time.
+Optional `--timezone` controls the time anchor — see **Time zone** above (default = local; `floating` = travel-proof; a zone name = fixed to that place).
 
 Example — "buy milk on the shopping list":
 ```
