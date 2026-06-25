@@ -11,10 +11,16 @@ public struct ReminderResponse: Codable, Sendable {
     public let listId: String
     public let completed: Bool
     public let completionDate: Date?
-    public let dueDate: Date?
+    /// Due date. Encoded with the fixed zone's UTC offset when anchored, or as a zone-less
+    /// wall-clock (no offset) when floating. See `ZonedDate`.
+    public let dueDate: ZonedDate?
     /// Time zone the due date is anchored to (IANA identifier), or nil when the reminder is
     /// floating (no zone — fires at the local wall-clock time). See docs/eventkit.md.
     public let timeZone: String?
+    /// True when the due date is floating: it has no time zone and fires at that wall-clock time
+    /// wherever the device is, so the time must not be converted across zones. False when anchored
+    /// to a zone or when there is no due date. Mirrors `timeZone == nil` but states it explicitly.
+    public let floating: Bool
     public let priority: String
     public let location: String?
     public let latitude: Double?
@@ -35,8 +41,12 @@ extension ReminderResponse {
         self.listId = reminder.calendar?.calendarIdentifier ?? ""
         self.completed = reminder.isCompleted
         self.completionDate = reminder.completionDate
-        self.dueDate = reminder.dueDateComponents?.date
-        self.timeZone = reminder.dueDateComponents?.timeZone?.identifier
+        let dueComponents = reminder.dueDateComponents
+        self.dueDate = dueComponents?.date.map {
+            ZonedDate(date: $0, timeZone: dueComponents?.timeZone)
+        }
+        self.timeZone = dueComponents?.timeZone?.identifier
+        self.floating = dueComponents?.date != nil && dueComponents?.timeZone == nil
         self.priority = ReminderPriority(ekValue: reminder.priority).rawValue
         let locationAlarm = reminder.alarms?.first { $0.structuredLocation != nil }
         self.location = locationAlarm?.structuredLocation?.title

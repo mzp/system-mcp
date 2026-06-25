@@ -32,7 +32,7 @@ enum ReminderMCP {
                     "due": string(
                         "Due date, ISO8601 (2026-06-10T10:00), today/tomorrow, or relative (+1h, +30m, +1h30m)"),
                     "timezone": string(
-                        "Time zone for the due date (IANA name like America/New_York, or EST). Omit for a floating reminder (fires at this wall-clock time in the local zone); set it to fix the due date to that zone's absolute moment."
+                        "Time zone for the due date (IANA name like America/New_York, or EST). Omit to fix the due date to the device's local zone; pass a zone to fix it to that zone's absolute moment; pass 'floating' for a zone-less reminder that fires at this wall-clock time wherever the device is."
                     ),
                     "notes": string("Notes"),
                     "priority": string("none | low | medium | high"),
@@ -50,7 +50,7 @@ enum ReminderMCP {
                     "title": string("New title"),
                     "due": string("New due date, ISO8601, today/tomorrow, or relative (+1h, +30m, +1h30m)"),
                     "timezone": string(
-                        "Time zone for the due date (IANA name like America/New_York, or EST). Omit for a floating reminder (fires at this wall-clock time in the local zone); set it to fix the due date to that zone's absolute moment."
+                        "Time zone for the due date (IANA name like America/New_York, or EST). Omit to fix the due date to the device's local zone; pass a zone to fix it to that zone's absolute moment; pass 'floating' for a zone-less reminder that fires at this wall-clock time wherever the device is."
                     ),
                     "notes": string("New notes"),
                     "priority": string("none | low | medium | high"),
@@ -128,24 +128,24 @@ enum ReminderMCP {
 
             case "add_reminder":
                 guard let title = args.str("title") else { return missing("title") }
-                let zone = try args.str("timezone").map(parseTimeZoneOrThrow)
-                let due = try args.str("due").map { try parseDateOrThrow($0, field: "due", timeZone: zone ?? .current) }
+                let anchor = try parseAnchorOrThrow(args.str("timezone"))
+                let due = try args.str("due").map { try parseDateOrThrow($0, field: "due", timeZone: anchor.parseZone) }
                 return jsonResult(
                     try await service.addReminder(
                         title: title, list: args.str("list"), due: due, notes: args.str("notes"),
                         priority: args.str("priority"), location: args.str("location"),
-                        proximity: args.str("proximity"), radius: args.double("radius"), timeZone: zone))
+                        proximity: args.str("proximity"), radius: args.double("radius"), anchor: anchor))
 
             case "update_reminder":
                 guard let id = args.str("id") else { return missing("id") }
-                let zone = try args.str("timezone").map(parseTimeZoneOrThrow)
-                let due = try args.str("due").map { try parseDateOrThrow($0, field: "due", timeZone: zone ?? .current) }
+                let anchor = try parseAnchorOrThrow(args.str("timezone"))
+                let due = try args.str("due").map { try parseDateOrThrow($0, field: "due", timeZone: anchor.parseZone) }
                 return jsonResult(
                     try await service.updateReminder(
                         id: id, title: args.str("title"), due: due,
                         notes: args.str("notes"), priority: args.str("priority"),
                         completed: args.bool("completed"), location: args.str("location"),
-                        proximity: args.str("proximity"), radius: args.double("radius"), timeZone: zone))
+                        proximity: args.str("proximity"), radius: args.double("radius"), anchor: anchor))
 
             case "move_reminder":
                 guard let id = args.str("id") else { return missing("id") }

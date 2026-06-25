@@ -129,15 +129,21 @@ import Testing
         #expect(due.minute == 30)
     }
 
-    @Test func jsonEncoderUsesISO8601AndSortedKeys() throws {
-        struct Sample: Codable {
+    @Test func jsonEncoderUsesISO8601WithOffsetAndSortedKeys() throws {
+        struct Sample: Codable, Equatable {
             let b: Date
             let a: String
         }
-        let date = Date(timeIntervalSince1970: 0)
-        let data = try DateParsing.jsonEncoder.encode(Sample(b: date, a: "x"))
+        let original = Sample(b: Date(timeIntervalSince1970: 0), a: "x")
+        let data = try DateParsing.jsonEncoder.encode(original)
         let json = String(decoding: data, as: UTF8.self)
-        #expect(json.contains("1970-01-01T00:00:00Z"))
+        // Dates carry an explicit offset (local-zone offset or `Z` for UTC), never a bare instant.
+        // Asserted via a tz-independent shape check rather than a fixed string.
+        let offsetShape = /"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})"/
+        #expect(json.firstMatch(of: offsetShape) != nil)
+        // Round-trips back to the same instant regardless of the machine's zone.
+        let decoded = try DateParsing.jsonDecoder.decode(Sample.self, from: data)
+        #expect(decoded == original)
         // sortedKeys: "a" must appear before "b"
         let aIndex = try #require(json.range(of: "\"a\"")?.lowerBound)
         let bIndex = try #require(json.range(of: "\"b\"")?.lowerBound)

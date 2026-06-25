@@ -49,17 +49,18 @@ struct RemindersCommand: AsyncParsableCommand {
         @Option(
             help: """
                 Time zone for the due date (IANA name like America/New_York, or EST). \
-                Without it the reminder floats (fires at this wall-clock time in the local zone); \
-                with it the due date is fixed to that zone's absolute moment.
+                Omit to fix the due date to the device's local zone; pass a zone to fix it to that \
+                zone's absolute moment; pass 'floating' for a zone-less reminder that fires at this \
+                wall-clock time wherever the device is.
                 """)
         var timezone: String?
 
         func run() async throws {
-            let zone = try timezone.map(parseTimeZoneOrThrow)
-            let dueDate = try due.map { try parseDateOrThrow($0, field: "due", timeZone: zone ?? .current) }
+            let anchor = try parseAnchorOrThrow(timezone)
+            let dueDate = try due.map { try parseDateOrThrow($0, field: "due", timeZone: anchor.parseZone) }
             let reminder = try await service.addReminder(
                 title: title, list: list, due: dueDate, notes: notes, priority: priority,
-                location: location, proximity: proximity, radius: radius, timeZone: zone)
+                location: location, proximity: proximity, radius: radius, anchor: anchor)
             Output.json(reminder)
         }
     }
@@ -82,18 +83,19 @@ struct RemindersCommand: AsyncParsableCommand {
         @Option(
             help: """
                 Time zone for the due date (IANA name like America/New_York, or EST). \
-                Without it the reminder floats (fires at this wall-clock time in the local zone); \
-                with it the due date is fixed to that zone's absolute moment.
+                Omit to fix the due date to the device's local zone; pass a zone to fix it to that \
+                zone's absolute moment; pass 'floating' for a zone-less reminder that fires at this \
+                wall-clock time wherever the device is.
                 """)
         var timezone: String?
 
         func run() async throws {
-            let zone = try timezone.map(parseTimeZoneOrThrow)
-            let dueDate = try due.map { try parseDateOrThrow($0, field: "due", timeZone: zone ?? .current) }
+            let anchor = try parseAnchorOrThrow(timezone)
+            let dueDate = try due.map { try parseDateOrThrow($0, field: "due", timeZone: anchor.parseZone) }
             let reminder = try await service.updateReminder(
                 id: id, title: title, due: dueDate, notes: notes,
                 priority: priority, completed: completed,
-                location: location, proximity: proximity, radius: radius, timeZone: zone)
+                location: location, proximity: proximity, radius: radius, anchor: anchor)
             Output.json(reminder)
         }
     }

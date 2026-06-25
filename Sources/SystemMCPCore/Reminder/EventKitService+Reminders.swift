@@ -128,26 +128,26 @@ extension EventKitService {
             case .completed, .all:
                 return true
             case .today:
-                guard let due = reminder.dueDate else { return false }
+                guard let due = reminder.dueDate?.date else { return false }
                 return calendar.isDate(due, inSameDayAs: now)
             case .tomorrow:
-                guard let due = reminder.dueDate,
+                guard let due = reminder.dueDate?.date,
                     let tomorrow = calendar.date(byAdding: .day, value: 1, to: now)
                 else { return false }
                 return calendar.isDate(due, inSameDayAs: tomorrow)
             case .week:
-                guard let due = reminder.dueDate,
+                guard let due = reminder.dueDate?.date,
                     let weekEnd = calendar.date(byAdding: .day, value: 7, to: startOfToday)
                 else { return false }
                 return due >= startOfToday && due < weekEnd
             case .overdue:
-                guard let due = reminder.dueDate else { return false }
+                guard let due = reminder.dueDate?.date else { return false }
                 return due < now
             case .upcoming:
-                guard let due = reminder.dueDate else { return false }
+                guard let due = reminder.dueDate?.date else { return false }
                 return due >= now
             case .range(let start, let end):
-                guard let due = reminder.dueDate else { return false }
+                guard let due = reminder.dueDate?.date else { return false }
                 if let start, due < start { return false }
                 if let end, due > end { return false }
                 return true
@@ -162,7 +162,7 @@ extension EventKitService {
     public func addReminder(
         title: String, list: String? = nil, due: Date? = nil, notes: String? = nil,
         priority: String? = nil, location: String? = nil, proximity: String? = nil,
-        radius: Double? = nil, timeZone: TimeZone? = nil
+        radius: Double? = nil, anchor: TimeAnchor = .local
     ) async throws -> ReminderResponse {
         log.debug(
             "addReminder",
@@ -170,7 +170,7 @@ extension EventKitService {
                 "title": .string(title), "list": .string(list ?? "<default>"),
                 "due": "\(due as Any)", "priority": .string(priority ?? "none"),
                 "location": .string(location ?? "<none>"),
-                "timeZone": .string(timeZone?.identifier ?? "<floating>"),
+                "anchor": "\(anchor)",
             ])
         try await ensureRemindersAccess()
         let reminder = EKReminder(eventStore: store)
@@ -182,7 +182,7 @@ extension EventKitService {
             throw EventKitError.saveFailed("no default reminder list available; specify --list")
         }
         if let notes { reminder.notes = notes }
-        if let due { reminder.dueDateComponents = DateParsing.dueComponents(from: due, timeZone: timeZone) }
+        if let due { reminder.dueDateComponents = DateParsing.dueComponents(from: due, timeZone: anchor.dueZone) }
         if let priority { reminder.priority = try Self.priorityValue(priority) }
         try await setLocationAlarm(on: reminder, location: location, proximity: proximity, radius: radius)
         try save(reminder)
@@ -194,7 +194,7 @@ extension EventKitService {
         id: String, title: String? = nil, due: Date? = nil,
         notes: String? = nil, priority: String? = nil, completed: Bool? = nil,
         location: String? = nil, proximity: String? = nil, radius: Double? = nil,
-        timeZone: TimeZone? = nil
+        anchor: TimeAnchor = .local
     ) async throws -> ReminderResponse {
         log.debug(
             "updateReminder",
@@ -208,7 +208,7 @@ extension EventKitService {
             throw EventKitError.notFound("reminder \(id)")
         }
         if let title { reminder.title = title }
-        if let due { reminder.dueDateComponents = DateParsing.dueComponents(from: due, timeZone: timeZone) }
+        if let due { reminder.dueDateComponents = DateParsing.dueComponents(from: due, timeZone: anchor.dueZone) }
         if let notes { reminder.notes = notes }
         if let priority { reminder.priority = try Self.priorityValue(priority) }
         if let completed { reminder.isCompleted = completed }
@@ -436,7 +436,7 @@ extension EventKitService {
     }
 
     private static func reminderOrder(_ a: ReminderResponse, _ b: ReminderResponse) -> Bool {
-        switch (a.dueDate, b.dueDate) {
+        switch (a.dueDate?.date, b.dueDate?.date) {
         case (let x?, let y?) where x != y:
             return x < y
         case (nil, _?):

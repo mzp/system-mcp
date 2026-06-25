@@ -59,29 +59,54 @@ EventKit / reminderkit を触っていて踏んだ、公式ドキュメントに
 recreate で複写するのは title / notes / priority / due / start / completed / url / alarms。
 繰り返しルール等スコープ外のフィールドは複写されない点に注意。
 
-## 3. リマインダーの期日は既定で floating（タイムゾーン無し）。イベントは絶対時刻
+## 3. 時刻のアンカー: 既定は端末ローカルゾーンで固定、floating は明示的に opt-in
 
 **背景**: EventKit ではイベント (`EKEvent`) とリマインダー (`EKReminder`) で時刻の持ち方が違う。
 
-- **イベント**: `startDate`/`endDate` は絶対時刻（`Date`）+ `timeZone`。常にタイムゾーン付きの
-  一点を指す。カレンダーアプリで表示ゾーンを切り替えると、壁掛け時計の表示は動くが**順序は不変**。
+- **イベント**: `startDate`/`endDate` は絶対時刻（`Date`）+ `timeZone`（optional）。`timeZone` セット時は
+  その一点を指す。カレンダーアプリで表示ゾーンを切り替えると、壁掛け時計の表示は動くが**順序は不変**。
+  `timeZone == nil` の floating イベントもあり得る（どの地域でもその壁掛け時計時刻）。
 - **リマインダー**: 期日は `dueDateComponents`（`DateComponents`）で持つ。`DateComponents.timeZone`
   が **nil なら floating**（タイムゾーン非依存の壁掛け時計時刻。デバイスの現在ゾーンでその時刻に発火）、
   **セットすれば fixed**（そのゾーンの絶対時刻に固定）。
 
 **問題**: floating なリマインダーと絶対時刻のイベントを同じタイムライン上で並べると、
 表示ゾーンを切り替えたときに**両者の前後関係がずれる**（floating 側だけ壁掛け時計に追従して動くため）。
-MCP/LLM 経由だとこの差を取り違えやすい。
+MCP/LLM 経由だとこの差を取り違えやすい。floating は特殊なので、**省略時に暗黙で floating になる**のは罠。
 
-**対処**: リマインダーにもタイムゾーンを**指定できる**ようにした（add/update の `--timezone` / `timezone`）。
+**対処（入力側のアンカー方針）**: floating を**別フラグにせず、`timezone` という 1 つの引数の選択肢**として
+表現する（`floating` は「ゾーン無し」というタイムゾーン指定の一種）。これで「ゾーン固定」と「floating」を
+同時に要求でき得ない＝**矛盾が構造的に起きない**。Calendar の UI（タイムゾーン欄に "None"＝floating がある）とも揃う。
+add/update の `timezone`（CLI `--timezone` / MCP `timezone`）の値:
 
-- 指定なし: 従来どおり floating（`dueDateComponents.timeZone == nil`）。Reminders アプリの既定挙動。
-- 指定あり: 入力日時をそのゾーンで解釈し、`dueDateComponents` をそのゾーンで抽出して
-  `dueDateComponents.timeZone` にセット → イベントと同じく絶対時刻に固定でき、順序が安定する。
+- **省略** → **端末ローカルゾーン（`.current`）で固定**（絶対時刻）。「9:00」＝「今この端末のゾーンの 9:00」。既定。
+- **ゾーン名（`America/New_York`, `EST` 等）** → そのゾーンで解釈・固定（順序が安定）。
+- **`floating`（または `none`、大小無視）** → ゾーン無しの floating（`DueComponents.timeZone == nil` /
+  `EKEvent.timeZone == nil`）。明示したときだけ floating になる。
 
-実装は `DateParsing.dueComponents(from:timeZone:)` の 1 箇所に集約（イベントの `EKEvent.timeZone` と対になる）。
-`ReminderResponse.timeZone` で現在の固定ゾーン（floating なら nil）を返す。
-相対オフセット（`+1h` 等）は now 基準で解決されゾーン非依存なので、`timezone` 併用時はその絶対時刻が固定される。
+実装は `TimeAnchor`（`local` / `floating` / `fixed(TimeZone)`）に集約。`parseAnchorOrThrow(_:)` が
+`timezone` 文字列を `TimeAnchor` に解決し、`parseZone`（入力日時の解釈ゾーン。local/floating は `.current`）と
+`dueZone`（リマインダーのアンカー。floating は nil）を提供。イベントは `applyAnchor` で適用し、`local` は
+**EKEvent のゾーンを触らない**（新規は既定でローカル、更新は既存ゾーンを保持）、`floating` は nil、`fixed` はそのゾーン。
+`ReminderResponse.timeZone` で現在の固定ゾーン（floating なら nil）、`floating: Bool` で floating を明示。
+相対オフセット（`+1h` 等）は now 基準で解決されゾーン非依存なので、ゾーン固定時はその絶対時刻が固定される。
+
+**JSON 出力の時刻表記**: 壁掛け時計が直接読めるよう、UTC の `Z` 固定はやめ、**意味に応じて形を変える**:
+
+- **fixed（ゾーン指定）の期日・イベント** — そのゾーンの **UTC オフセット付き** ISO8601
+  （`2026-06-15T20:08:00-07:00`）。絶対時刻なので、その offset で読めばよい。
+- **floating（ゾーン無し）の期日・イベント** — **オフセット無し**の壁掛け時計（`2026-06-10T09:00:00`）。
+  floating は「どの地域でもその壁掛け時計時刻に発火」する性質で offset の概念が無いため、付けると
+  「固定された予定」に誤読され、LLM が他ゾーンへ変換しかねない。offset を**付けない**ことで
+  「ゾーン非依存・変換するな」を表す。さらにレスポンスに **`floating: true`** を立てて明示する
+  （`timeZone == nil` と等価だが、nil の見落としを防ぐため独立フィールドにした）。
+- **`creationDate` 等のメタデータ** — 端末ローカル（`.current`）のオフセット付き。
+
+これにより MCP/LLM が UTC→現地の変換を手計算する必要がなくなり、報告時刻の取り違えを防ぐ。
+実装: アンカー付き日付は `ZonedDate`（`timeZone` 非 nil → `DateParsing.iso8601String`、nil → `floatingString`）、
+メタデータは `jsonEncoder` の custom strategy（`.current` オフセット）。`floating` フラグは
+`ReminderResponse`/`EventResponse` の init で `dueDateComponents?.timeZone == nil` /
+`EKEvent.timeZone == nil` から立てる。
 
 ## 補足: 同名リストの曖昧さ
 

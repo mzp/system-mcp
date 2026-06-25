@@ -36,8 +36,9 @@ import Testing
         #expect(response.completionDate == nil)
         #expect(response.priority == "high")
         #expect(response.url == "https://example.com/x")
-        #expect(response.dueDate == due.date)
+        #expect(response.dueDate?.date == due.date)
         #expect(response.timeZone == nil)  // floating: no zone on the due components
+        #expect(response.floating == true)  // due date with no zone is floating
         #expect(response.location == nil)  // no location alarm
         #expect(response.proximity == nil)
     }
@@ -52,6 +53,7 @@ import Testing
 
         let response = ReminderResponse(reminder)
         #expect(response.timeZone == "America/New_York")
+        #expect(response.floating == false)  // anchored to a zone, not floating
     }
 
     @Test func convertsLocationAlarm() {
@@ -126,14 +128,27 @@ import Testing
         #expect(response.notes == "daily")
         #expect(response.calendar == "Work")
         #expect(response.calendarId == calendar.calendarIdentifier)
-        #expect(response.startDate == start)
-        #expect(response.endDate == start.addingTimeInterval(1800))
+        #expect(response.startDate?.date == start)
+        #expect(response.endDate?.date == start.addingTimeInterval(1800))
         #expect(response.isAllDay == false)
         #expect(response.location == "Zoom")
         #expect(response.latitude == nil)  // plain-text location carries no coordinates
         #expect(response.longitude == nil)
         #expect(response.url == "https://example.com/meet")
         #expect(response.status == nil)  // EKEventStatus.none -> nil
+        #expect(response.floating == false)  // EKEvent defaults to the local zone
+    }
+
+    @Test func surfacesFloatingEvent() {
+        let store = EKEventStore()
+        let event = EKEvent(eventStore: store)
+        event.startDate = Date(timeIntervalSince1970: 1_750_000_000)
+        event.endDate = event.startDate.addingTimeInterval(1800)
+        event.timeZone = nil  // floating: no zone
+
+        let response = EventResponse(event)
+        #expect(response.timeZone == nil)
+        #expect(response.floating == true)
     }
 
     @Test func convertsTimeZone() {

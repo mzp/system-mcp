@@ -81,10 +81,37 @@ public enum DateParsing {
         return components
     }
 
+    /// Formats `date` as ISO8601 (`yyyy-MM-dd'T'HH:mm:ssZZZZZ`) anchored to `timeZone`, so the
+    /// string carries the wall-clock time *and* its UTC offset (`2026-06-15T20:08:00-07:00`, or
+    /// `…Z` for UTC). This lets a reader see the local time directly without converting from UTC.
+    public static func iso8601String(_ date: Date, timeZone: TimeZone) -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        f.timeZone = timeZone
+        return f.string(from: date)
+    }
+
+    /// Formats `date` as a *floating* (zone-less) ISO8601 wall-clock string with **no** offset
+    /// (`2026-06-10T09:00:00`). The wall-clock is read in the local zone, recovering the components
+    /// a floating reminder/event was set with. The absent offset signals "this time has no zone —
+    /// don't convert it" (paired with `floating: true` in the response). See `ZonedDate`.
+    public static func floatingString(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = .current
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        return f.string(from: date)
+    }
+
     /// JSON encoder/decoder with ISO8601 dates, shared so CLI and MCP emit identical output.
+    /// Dates are emitted in the local zone with an explicit offset (not UTC `Z`) so the wall-clock
+    /// time is readable as-is. `ZonedDate` fields override this with their own anchor zone.
     public static let jsonEncoder: JSONEncoder = {
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            try container.encode(iso8601String(date, timeZone: .current))
+        }
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         return encoder
     }()

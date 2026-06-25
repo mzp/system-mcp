@@ -41,7 +41,9 @@ enum CalendarMCP {
                     "end": string("End, ISO8601, today/tomorrow, or relative (+1h, +30m)"),
                     "timezone": string(
                         "Time zone of the event (IANA name like America/New_York, or EST). "
-                            + "Start/end without an explicit offset are interpreted in this zone; local time if omitted"
+                            + "Omit to anchor the event to the device's local zone; pass a zone to anchor to it; "
+                            + "pass 'floating' for a zone-less event that occurs at this wall-clock time wherever "
+                            + "the device is. Start/end without an explicit offset are interpreted in this zone."
                     ),
                     "allDay": bool("All-day event"),
                     "notes": string("Notes"),
@@ -60,7 +62,9 @@ enum CalendarMCP {
                     "end": string("New end, ISO8601, today/tomorrow, or relative (+1h, +30m)"),
                     "timezone": string(
                         "New time zone of the event (IANA name like America/New_York, or EST). "
-                            + "Start/end without an explicit offset are interpreted in this zone"),
+                            + "Omit to leave the event's current zone unchanged; pass a zone to anchor it there; "
+                            + "pass 'floating' for a zone-less event. Start/end without an explicit offset are "
+                            + "interpreted in this zone."),
                     "allDay": bool("All-day event"),
                     "notes": string("New notes"),
                     "location": string(
@@ -100,30 +104,30 @@ enum CalendarMCP {
                 guard let title = args.str("title") else { return missing("title") }
                 guard let start = args.str("start") else { return missing("start") }
                 guard let end = args.str("end") else { return missing("end") }
-                let zone = try args.str("timezone").map(parseTimeZoneOrThrow)
+                let anchor = try parseAnchorOrThrow(args.str("timezone"))
                 return jsonResult(
                     try await service.addEvent(
                         title: title, calendar: args.str("calendar"),
-                        start: try parseDateOrThrow(start, field: "start", timeZone: zone ?? .current),
-                        end: try parseDateOrThrow(end, field: "end", timeZone: zone ?? .current),
+                        start: try parseDateOrThrow(start, field: "start", timeZone: anchor.parseZone),
+                        end: try parseDateOrThrow(end, field: "end", timeZone: anchor.parseZone),
                         isAllDay: args.bool("allDay") ?? false, notes: args.str("notes"),
-                        location: args.str("location"), url: args.str("url"), timeZone: zone))
+                        location: args.str("location"), url: args.str("url"), anchor: anchor))
 
             case "update_event":
                 guard let id = args.str("id") else { return missing("id") }
-                let zone = try args.str("timezone").map(parseTimeZoneOrThrow)
+                let anchor = try parseAnchorOrThrow(args.str("timezone"))
                 let start = try args.str("start").map {
-                    try parseDateOrThrow($0, field: "start", timeZone: zone ?? .current)
+                    try parseDateOrThrow($0, field: "start", timeZone: anchor.parseZone)
                 }
                 let end = try args.str("end").map {
-                    try parseDateOrThrow($0, field: "end", timeZone: zone ?? .current)
+                    try parseDateOrThrow($0, field: "end", timeZone: anchor.parseZone)
                 }
                 return jsonResult(
                     try await service.updateEvent(
                         id: id, title: args.str("title"), calendar: args.str("calendar"),
                         start: start, end: end, isAllDay: args.bool("allDay"),
                         notes: args.str("notes"), location: args.str("location"), url: args.str("url"),
-                        timeZone: zone))
+                        anchor: anchor))
 
             case "delete_events":
                 guard let ids = args.strArray("ids") else { return missing("ids") }

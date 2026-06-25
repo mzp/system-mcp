@@ -101,3 +101,13 @@ public func parseTimeZoneOrThrow(_ string: String) throws -> TimeZone {
     }
     return zone
 }
+
+/// Resolves the optional `timezone` argument into a `TimeAnchor`: omitted/empty → `.local`,
+/// `floating`/`none` (case-insensitive) → `.floating`, otherwise an IANA name or abbreviation
+/// → `.fixed`. Throws on an unrecognized zone.
+public func parseAnchorOrThrow(_ string: String?) throws -> TimeAnchor {
+    let trimmed = string?.trimmingCharacters(in: .whitespaces) ?? ""
+    guard !trimmed.isEmpty else { return .local }
+    if TimeAnchor.floatingNames.contains(trimmed.lowercased()) { return .floating }
+    return .fixed(try parseTimeZoneOrThrow(trimmed))
+}

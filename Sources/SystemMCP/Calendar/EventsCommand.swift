@@ -43,17 +43,19 @@ struct EventsCommand: AsyncParsableCommand {
         @Option(
             help: """
                 Time zone of the event (IANA name like America/New_York, or EST). \
-                Start/end without an explicit offset are interpreted in this zone.
+                Omit to anchor the event to the device's local zone; pass a zone to anchor to it; \
+                pass 'floating' for a zone-less event that occurs at this wall-clock time wherever \
+                the device is. Start/end without an explicit offset are interpreted in this zone.
                 """)
         var timezone: String?
 
         func run() async throws {
-            let zone = try timezone.map(parseTimeZoneOrThrow)
-            let startDate = try parseDateOrThrow(start, field: "start", timeZone: zone ?? .current)
-            let endDate = try parseDateOrThrow(end, field: "end", timeZone: zone ?? .current)
+            let anchor = try parseAnchorOrThrow(timezone)
+            let startDate = try parseDateOrThrow(start, field: "start", timeZone: anchor.parseZone)
+            let endDate = try parseDateOrThrow(end, field: "end", timeZone: anchor.parseZone)
             let event = try await service.addEvent(
                 title: title, calendar: calendar, start: startDate, end: endDate,
-                isAllDay: allDay, notes: notes, location: location, url: url, timeZone: zone)
+                isAllDay: allDay, notes: notes, location: location, url: url, anchor: anchor)
             Output.json(event)
         }
     }
@@ -74,17 +76,19 @@ struct EventsCommand: AsyncParsableCommand {
         @Option(
             help: """
                 New time zone of the event (IANA name like America/New_York, or EST). \
-                Start/end without an explicit offset are interpreted in this zone.
+                Omit to leave the event's current zone unchanged; pass a zone to anchor it there; \
+                pass 'floating' for a zone-less event. Start/end without an explicit offset are \
+                interpreted in this zone.
                 """)
         var timezone: String?
 
         func run() async throws {
-            let zone = try timezone.map(parseTimeZoneOrThrow)
-            let startDate = try start.map { try parseDateOrThrow($0, field: "start", timeZone: zone ?? .current) }
-            let endDate = try end.map { try parseDateOrThrow($0, field: "end", timeZone: zone ?? .current) }
+            let anchor = try parseAnchorOrThrow(timezone)
+            let startDate = try start.map { try parseDateOrThrow($0, field: "start", timeZone: anchor.parseZone) }
+            let endDate = try end.map { try parseDateOrThrow($0, field: "end", timeZone: anchor.parseZone) }
             let event = try await service.updateEvent(
                 id: id, title: title, calendar: calendar, start: startDate, end: endDate,
-                isAllDay: allDay, notes: notes, location: location, url: url, timeZone: zone)
+                isAllDay: allDay, notes: notes, location: location, url: url, anchor: anchor)
             Output.json(event)
         }
     }

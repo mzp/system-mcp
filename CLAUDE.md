@@ -32,7 +32,8 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
     - `StatusResponse.swift` — 認可状態 DTO（`authorizationStatus`/`requestAccess` の戻り値、単一エンティティ）。
   - `Reminder/` — reminder ドメイン。
     - `EventKitService+Reminders.swift` — `extension EventKitService` に reminder/list の CRUD（`public`）と `ReminderFilter`。
-      `timeZone` 指定時は期日を絶対時刻に固定（`dueDateComponents.timeZone` セット）、未指定なら floating（既定）。詳細は `docs/eventkit.md`。
+      期日のアンカーは `TimeAnchor`（add/update の `anchor:`）で表現: 省略＝端末ローカルで固定、ゾーン名＝そのゾーンで固定、
+      `floating`＝ゾーン無し。`anchor.dueZone` を `DateParsing.dueComponents` に渡す。詳細は `docs/eventkit.md`。
       `location`/`proximity`/`radius` で場所トリガー付き `EKAlarm` をセット（座標解決できない location はエラー。
       update 時は既存の場所アラームを置き換え、時刻ベースのアラームは保持）。
       リスト変更は `updateReminder` ではなく専用の `moveReminder(id:list:)` で行う。場所アラーム付きの
@@ -44,22 +45,35 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
       `force` 指定時のみ作成（force はユーザーの明示的許可が前提）。詳細は `docs/eventkit.md`。
     - `ReminderResponse.swift` — `ReminderResponse` + EK 変換（場所アラームの
       `location`/`latitude`/`longitude`/`proximity`/`radius` も含む。radius 0 はシステム既定として nil。
-      `timeZone` は固定された期日のゾーン識別子。floating（タイムゾーン無し）なら nil）。
+      `timeZone` は固定された期日のゾーン識別子。floating（タイムゾーン無し）なら nil。
+      `dueDate` は `ZonedDate`（fixed はそのゾーンのオフセット付き、floating はオフセット無しの壁掛け時計で出力）。
+      `floating: Bool` で floating（期日有り＆ゾーン無し）を明示）。
     - `ReminderPriority.swift` — `ReminderPriority`(none/low/medium/high ⇄ 0/1/5/9)。
     - `AlarmProximity.swift` — `AlarmProximity`(enter/leave ⇄ `EKAlarmProximity`)。
   - `Calendar/` — event ドメイン。
     - `EventKitService+Events.swift` — `extension EventKitService` に event/calendar の CRUD（`public`）。
       location は `Geocoder` で座標解決して `EKStructuredLocation` をセット（解決不能ならテキストのみ）。
-      `timeZone` 指定時は `EKEvent.timeZone` にセット（add/update の `--timezone` / `timezone`。
-      日付文字列の解釈もそのゾーンで行う）。
+      ゾーンは `TimeAnchor`（add/update の `anchor:`）を `applyAnchor` で適用: `local` は `EKEvent.timeZone` を
+      触らない（新規は既定ローカル・更新は既存保持）、`floating` は nil、`fixed` はそのゾーン。
+      日付文字列の解釈は `anchor.parseZone`（省略時ローカル）で行う。
     - `EventResponse.swift` — `EventResponse` + EK 変換（`latitude`/`longitude` は `structuredLocation` 由来、
-      `timeZone` は `EKEvent.timeZone` の識別子）。
+      `timeZone` は `EKEvent.timeZone` の識別子。`startDate`/`endDate` は `ZonedDate`（ゾーン有りはオフセット付き、
+      floating（`EKEvent.timeZone == nil`）はオフセット無しの壁掛け時計）。`floating: Bool` で floating を明示）。
     - `CalendarResponse.swift` — カレンダー / リマインダーリスト両用のレスポンス型（`listCalendars` と `listReminderLists` が返す）。
   - ルート直下（ドメイン非依存）:
     - `DateParsing.swift` — `DateParsing.parse`（ISO8601 / オフセット付き ISO8601 / `today`・`tomorrow`・`yesterday` /
       相対オフセット `+1h`・`+30m`・`+1h30m`・`-2d`（符号必須・now 基準で `Calendar.date(byAdding:)` 解決、`timeZone` 非依存）。
       `timeZone:` でオフセットなし入力の解釈ゾーンを指定可、既定はローカル）、
-      `DateParsing.timeZone(from:)`（IANA 名・略称→`TimeZone`）と共有 JSON encoder/decoder。
+      `DateParsing.timeZone(from:)`（IANA 名・略称→`TimeZone`）、`DateParsing.iso8601String`（指定ゾーンの
+      オフセット付き ISO8601）／`floatingString`（オフセット無しの壁掛け時計）と共有 JSON encoder/decoder。
+      **encoder は日付を UTC `Z` ではなくローカルオフセット付きで出力**（壁掛け時計が直接読め、UTC→現地の
+      変換ミスを防ぐ）。
+    - `ZonedDate.swift` — `Date` + `TimeZone?` のラッパー。`Codable` 型で、`timeZone` 非 nil はその
+      ゾーンのオフセット付き、nil（floating）はオフセット無しの壁掛け時計へエンコードする
+      （reminder の `dueDate`、event の `start`/`end` で使用）。
+    - `TimeAnchor.swift` — `local` / `floating` / `fixed(TimeZone)` で時刻のアンカー方法を表す型
+      （`timezone` 引数の解釈。`parseAnchorOrThrow` で生成、`parseZone`/`dueZone` を提供）。floating を
+      タイムゾーン指定の一種として扱い、矛盾する組み合わせを構造的に排除する。詳細は `docs/eventkit.md`。
     - `Geocoder.swift` — `CLGeocoder` による住所/地名→座標の前方ジオコーディング（event の構造化ロケーションと
       reminder の場所トリガーの両方で使用。位置情報権限は不要・ネットワークは必要。失敗時は nil を返す）。
     - `Logging.swift` — 共有ロガー `log`。**stderr + 任意でファイル**に出力（stdout には絶対出さない）。
@@ -67,7 +81,8 @@ executable `SystemMCP` は CLI/MCP の薄い presentation 層に徹する。
       `SYSTEM_MCP_LOG`(レベル) / `SYSTEM_MCP_LOG_FILE`(出力先) で上書き可。
     - `ProcessName.swift` — `executableName()`（`CommandLine.arguments[0]` の basename）。
     - `MCPSupport.swift` — MCP/CLI ヘルパー（JSON Schema builder `object/string/bool/stringArray`、
-      `jsonResult/errorResult/missing`、引数アクセサ、`Output.json`、`parseDateOrThrow`、`parseTimeZoneOrThrow`）。
+      `jsonResult/errorResult/missing`、引数アクセサ、`Output.json`、`parseDateOrThrow`、`parseTimeZoneOrThrow`、
+      `parseAnchorOrThrow`（`timezone` 文字列→`TimeAnchor`））。
 - **`Sources/SystemMCP/`** — `systemmcp` 実行ファイル（薄い CLI/MCP 層）。
   - `Main.swift` — `@main struct SystemMCPCommand`、commandName `systemmcp`、subcommands `reminder` / `calendar`、
     グローバル `service`（両ドメイン共用の単一 actor インスタンス）。

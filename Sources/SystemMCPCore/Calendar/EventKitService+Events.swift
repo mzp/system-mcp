@@ -28,21 +28,20 @@ extension EventKitService {
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: calendars)
         let result = store.events(matching: predicate)
             .map(EventResponse.init)
-            .sorted { ($0.startDate ?? .distantPast) < ($1.startDate ?? .distantPast) }
+            .sorted { ($0.startDate?.date ?? .distantPast) < ($1.startDate?.date ?? .distantPast) }
         log.debug("fetchEvents result", metadata: ["count": "\(result.count)"])
         return result
     }
 
     public func addEvent(
         title: String, calendar: String? = nil, start: Date, end: Date, isAllDay: Bool = false,
-        notes: String? = nil, location: String? = nil, url: String? = nil, timeZone: TimeZone? = nil
+        notes: String? = nil, location: String? = nil, url: String? = nil, anchor: TimeAnchor = .local
     ) async throws -> EventResponse {
         log.debug(
             "addEvent",
             metadata: [
                 "title": .string(title), "calendar": .string(calendar ?? "<default>"),
-                "start": "\(start)", "end": "\(end)", "allDay": "\(isAllDay)",
-                "timeZone": .string(timeZone?.identifier ?? "<floating>"),
+                "start": "\(start)", "end": "\(end)", "allDay": "\(isAllDay)", "anchor": "\(anchor)",
             ])
         try await ensureEventsAccess()
         let event = EKEvent(eventStore: store)
@@ -56,7 +55,7 @@ extension EventKitService {
         event.startDate = start
         event.endDate = end
         event.isAllDay = isAllDay
-        if let timeZone { event.timeZone = timeZone }
+        applyAnchor(anchor, to: event)
         if let notes { event.notes = notes }
         if let location { event.structuredLocation = await structuredLocation(for: location) }
         if let url { event.url = URL(string: url) }
@@ -72,9 +71,9 @@ extension EventKitService {
     public func updateEvent(
         id: String, title: String? = nil, calendar: String? = nil, start: Date? = nil,
         end: Date? = nil, isAllDay: Bool? = nil, notes: String? = nil, location: String? = nil,
-        url: String? = nil, timeZone: TimeZone? = nil
+        url: String? = nil, anchor: TimeAnchor = .local
     ) async throws -> EventResponse {
-        log.debug("updateEvent", metadata: ["id": .string(id)])
+        log.debug("updateEvent", metadata: ["id": .string(id), "anchor": "\(anchor)"])
         try await ensureEventsAccess()
         guard let event = store.event(withIdentifier: id) else {
             throw EventKitError.notFound("event \(id)")
@@ -84,7 +83,7 @@ extension EventKitService {
         if let start { event.startDate = start }
         if let end { event.endDate = end }
         if let isAllDay { event.isAllDay = isAllDay }
-        if let timeZone { event.timeZone = timeZone }
+        applyAnchor(anchor, to: event)
         if let notes { event.notes = notes }
         if let location { event.structuredLocation = await structuredLocation(for: location) }
         if let url { event.url = URL(string: url) }
@@ -94,6 +93,17 @@ extension EventKitService {
             throw EventKitError.saveFailed(error.localizedDescription)
         }
         return EventResponse(event)
+    }
+
+    /// Applies a `TimeAnchor` to an event's zone. `.local` leaves the zone untouched — a new event
+    /// already defaults to the local zone, and on update this preserves the event's existing zone
+    /// unless the caller explicitly re-anchors it. `.floating` clears the zone; `.fixed` sets it.
+    private func applyAnchor(_ anchor: TimeAnchor, to event: EKEvent) {
+        switch anchor {
+        case .local: break
+        case .floating: event.timeZone = nil
+        case .fixed(let zone): event.timeZone = zone
+        }
     }
 
     public func deleteEvents(ids: [String]) async throws {
