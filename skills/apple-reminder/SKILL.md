@@ -1,6 +1,6 @@
 ---
 name: apple-reminder
-description: View, add, update, complete, and delete macOS Reminders, and manage reminder lists, via the systemmcp CLI. Always use this skill for anything about reminders, to-dos, shopping lists, or reminder lists — including Japanese requests like 「リマインダー追加して」「〇〇をリマインドして」「買い物リストに〇〇足して」「今日のリマインダー見せて」「やることリスト確認」「リマインダー完了にして」「リマインダー消して」「リマインダーリスト作って」. Calendar events are handled by the separate apple-calendar skill.
+description: View, add, update, complete, and delete macOS Reminders, and manage reminder lists, via the systemmcp CLI. Always use this skill for anything about reminders, to-dos, shopping lists, or reminder lists — including Japanese requests like 「リマインダー追加して」「〇〇をリマインドして」「買い物リストに〇〇を追加して」「買い物リストに〇〇足して」「リストに〇〇を入れて」「今日のリマインダー見せて」「やることリスト確認」「リマインダー完了にして」「リマインダー消して」「リマインダーリスト作って」. Adding an item to a named list (買い物・やること etc.) — whether phrased 追加して／足して／入れて — always goes through this skill. Calendar events are handled by the separate apple-calendar skill.
 ---
 
 # apple-reminder

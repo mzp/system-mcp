@@ -113,6 +113,46 @@ case_kitchen() {
   fi
 }
 
+# ── Auto-trigger case (self-cleaning): no "apple-reminderスキルで" prefix ────────────
+# The user's bare phrasing 「買い物リストに〇〇を追加して」 must select this skill on its
+# own (description-driven), then emit `reminders add … --list 買い物`.
+case_milk() {
+  local item="[テスト用]牛乳"
+  echo "[milk] ${item}を買い物リストに追加して  (no skill prefix — auto-trigger)"
+  local before after added t
+  before="$(shop_ids | sort)"
+  t="$(ask "買い物リストに「${item}」を追加して")"
+  after="$(shop_ids | sort)"
+  added="$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after"))"
+
+  # auto-triggered the skill and emitted the right add
+  if have "$t" "reminders add" && have "$t" "$item" && have "$t" "$SHOP"; then
+    ok "auto-triggered: reminders add --title $item --list 買い物"
+  else
+    bad "did not auto-trigger apple-reminder for the bare 追加して phrasing"
+  fi
+
+  # real effect: the item appeared in 買い物
+  local n match title; n="$(printf '%s' "$added" | grep -c .)"; match=0
+  while read -r id; do
+    [ -z "$id" ] && continue
+    title="$(sysmcp reminder reminders list --filter all --list "$SHOP" \
+      | python3 -c 'import sys,json;d=json.load(sys.stdin);i=sys.argv[1];print(next((r["title"] for r in d if r["id"]==i),""))' "$id" 2>/dev/null)"
+    [ "$title" = "$item" ] && match=$((match+1))
+  done <<<"$added"
+  if [ "$match" -ge 1 ]; then
+    ok "added $match $item reminder(s) to 買い物 (of $n new)"
+  else
+    bad "no new $item reminder appeared (n=$n)"
+  fi
+
+  # cleanup: delete only what we added
+  if [ -n "$added" ]; then
+    while read -r id; do [ -n "$id" ] && sysmcp reminder reminders delete "$id" >/dev/null; done <<<"$added"
+    echo "  cleanup: deleted $n added reminder(s)"
+  fi
+}
+
 # ── Time-zone case (self-cleaning): a travel-proof reminder → --timezone floating ───
 # "fire at 9am wherever I am" is the floating anchor. Checks both the emitted flag and
 # that the created reminder really has floating:true, then deletes it by unique title.
@@ -147,6 +187,7 @@ run() {
     shop_list)    case_shop_list ;;
     cal_tomorrow) case_cal_tomorrow ;;
     kitchen)      case_kitchen ;;
+    milk)         case_milk ;;
     tz_floating)  case_tz_floating ;;
     *) echo "unknown case: $1" >&2; exit 2 ;;
   esac
@@ -157,7 +198,7 @@ echo
 if [ $# -ge 1 ]; then
   run "$1"
 else
-  for c in today shop_list cal_tomorrow kitchen tz_floating; do run "$c"; echo; done
+  for c in today shop_list cal_tomorrow kitchen milk tz_floating; do run "$c"; echo; done
 fi
 echo
 echo "── result: $PASS passed, $FAIL failed ──"
